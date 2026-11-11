@@ -1,0 +1,77 @@
+# Coolify deployment of the mish stack.
+#
+# Same services as the root docker-compose.yml, but without host port
+# mappings: Coolify's Traefik proxy routes to the containers over the Docker
+# network. Set SERVICE_FQDN_MISH_8080 and SERVICE_FQDN_MISH_SITE_80 in the
+# Coolify application environment to assign domains.
+#
+# Images are tagged for GHCR so a build can be pushed with `docker compose push`
+# and matches the release workflow.
+
+services:
+  mish:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.server
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
+    expose:
+      - "8080"
+    environment:
+      MISH_DATA_DIR: /data
+      MISH_BIND: 0.0.0.0:8080
+      MISH_CORE_SOCKET: /run/mish/mish.sock
+      MISH_ROOTS: ${MISH_ROOTS:-/host}
+      MISH_HOST_ROOT: /host
+      MISH_DOCKER: ${MISH_DOCKER:-true}
+      MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-false}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+      - mish-data:/data
+      - ${HOST_MOUNT:-/}:/host:ro
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - docker-socket-proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      VOLUMES: 1
+      EVENTS: 0
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  mish-site:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.site
+    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  mish-data:
