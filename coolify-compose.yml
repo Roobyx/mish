@@ -1,4 +1,4 @@
-# Coolify deployment of the mish stack.
+# Coolify deployment of the mish stack (repo-root compose file).
 #
 # Same services as the root docker-compose.yml, but without host port
 # mappings: Coolify's Traefik proxy routes to the containers over the Docker
@@ -11,7 +11,7 @@
 services:
   mish:
     build:
-      context: ../..
+      context: .
       dockerfile: deploy/docker/Dockerfile.server
     image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
     expose:
@@ -60,7 +60,7 @@ services:
 
   mish-site:
     build:
-      context: ../..
+      context: .
       dockerfile: deploy/docker/Dockerfile.site
     image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
     expose:
