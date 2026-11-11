@@ -1,9 +1,9 @@
-# Coolify deployment of the mish stack (repo-root compose file).
+# Coolify deployment of the mish stack.
 #
-# Same services as the root docker-compose.yml, but without host port
-# mappings: Coolify's Traefik proxy routes to the containers over the Docker
-# network. Set SERVICE_FQDN_MISH_8080 and SERVICE_FQDN_MISH_SITE_80 in the
-# Coolify application environment to assign domains.
+# Coolify's built-in proxy is not used. The app and site publish host ports and
+# an external reverse proxy routes:
+#   app.cats-on-a.quest      -> 127.0.0.1:8080
+#   scanscan.cats-on-a.quest -> 0.0.0.0:3300
 #
 # Images are tagged for GHCR so a build can be pushed with `docker compose push`
 # and matches the release workflow.
@@ -14,8 +14,8 @@ services:
       context: .
       dockerfile: deploy/docker/Dockerfile.server
     image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
-    expose:
-      - "8080"
+    ports:
+      - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-8080}:8080"
     environment:
       MISH_DATA_DIR: /data
       MISH_BIND: 0.0.0.0:8080
@@ -24,8 +24,8 @@ services:
       MISH_HOST_ROOT: /host
       MISH_DOCKER: ${MISH_DOCKER:-true}
       MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
-      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
-      MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-false}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-app.cats-on-a.quest,localhost,127.0.0.1}
+      MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-true}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:
       - mish-data:/data
@@ -63,8 +63,8 @@ services:
       context: .
       dockerfile: deploy/docker/Dockerfile.site
     image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
-    expose:
-      - "80"
+    ports:
+      - "${MISH_SITE_PORT:-3300}:80"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s
