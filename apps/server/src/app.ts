@@ -182,9 +182,14 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         } catch {
           return c.json({ error: "invalid_origin" }, 403);
         }
-        const expected = requestHost(c).toLowerCase();
-        if (!expected || originHost !== expected) {
-          return c.json({ error: "cross_origin_request" }, 403);
+        const expected = hostnameOf(requestHost(c));
+        const originHostname = hostnameOf(originHost);
+        // A trusted proxy may rewrite Host to the backend address. In that case
+        // accept an Origin that matches a configured allowed host.
+        if (!expected || originHostname !== expected) {
+          if (!(trustProxy && originHostname && allowedHosts.has(originHostname))) {
+            return c.json({ error: "cross_origin_request" }, 403);
+          }
         }
       }
       const contentType = (c.req.header("content-type") ?? "").toLowerCase();

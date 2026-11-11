@@ -119,6 +119,29 @@ describe("server API", () => {
     expect(textPlain.status).toBe(415);
   });
 
+  test("accepts a proxied origin from an allowed host", async () => {
+    const core = new StubCore(() => ({}));
+    const app = createApp({
+      config: {
+        ...config(),
+        trustProxy: true,
+        allowedHosts: ["mish.cats-on-a.quest"],
+      },
+      core,
+    });
+
+    const res = await app.request("/api/v1/gc", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-host": "127.0.0.1:9543",
+        origin: "https://mish.cats-on-a.quest",
+      },
+      body: JSON.stringify({ keep: 3 }),
+    });
+    expect(res.status).not.toBe(403);
+  });
+
   test("clamps export limits", async () => {
     const core = new StubCore(() => ({ items: [] }));
     const app = createApp({ config: config(), core });

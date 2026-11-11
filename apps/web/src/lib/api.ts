@@ -18,7 +18,7 @@ import type {
   VolumeInfo,
 } from "@mish/api-types";
 
-const BASE = "/api/v1";
+const BASE = `${import.meta.env.BASE_URL}api/v1`;
 const TOKEN_KEY = "mish.token";
 
 export class ApiError extends Error {

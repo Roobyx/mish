@@ -13,6 +13,8 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.server
+      args:
+        MISH_WEB_BASE: /app/
     image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
     ports:
       - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-9543}:9543"
@@ -24,7 +26,7 @@ services:
       MISH_HOST_ROOT: /host
       MISH_DOCKER: ${MISH_DOCKER:-true}
       MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
-      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-app.cats-on-a.quest,localhost,127.0.0.1}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-mish.cats-on-a.quest,app.cats-on-a.quest,localhost,127.0.0.1}
       MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-true}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:
