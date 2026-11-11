@@ -7,7 +7,7 @@
 # proxy; the proxy is the only service that touches the Docker socket.
 services:
   mish:
-    image: mish/server:${MISH_TAG:-dev}
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.server
@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
 
   mish-site:
-    image: mish/site:${MISH_TAG:-dev}
+    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.site

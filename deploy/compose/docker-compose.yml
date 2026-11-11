@@ -5,7 +5,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.server
-    image: mish/server:${MISH_TAG:-dev}
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
     ports:
       # Loopback by default. For LAN access set MISH_PUBLISH_ADDR=0.0.0.0,
       # MISH_BIND=0.0.0.0:8080 and a strong MISH_AUTH_TOKEN.
@@ -58,7 +58,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile.site
-    image: mish/site:${MISH_TAG:-dev}
+    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
     ports:
       - "${MISH_SITE_PORT:-3300}:80"
     restart: unless-stopped
