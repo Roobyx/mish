@@ -33,6 +33,7 @@ Diskover's Elasticsearch-shaped RAM bill.
 ## Contents
 
 - [Why mish](#why-mish)
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
@@ -56,6 +57,20 @@ Diskover's Elasticsearch-shaped RAM bill.
   socket proxy. There is no delete, move or chmod anywhere in the product.
 - **Scriptable first.** Every CLI command speaks JSON, the daemon speaks versioned JSON-RPC, and the
   REST API mirrors both. The web client is a consumer, not a privileged layer.
+
+## Screenshots
+
+| Drives | Treemap |
+|---|---|
+| ![Drives view showing per-filesystem usage cards](docs/screenshots/drives.png) | ![Treemap view showing squarified directory sizes](docs/screenshots/treemap.png) |
+
+| Sunburst | Icicle |
+|---|---|
+| ![Sunburst view](docs/screenshots/sunburst.png) | ![Icicle view](docs/screenshots/icicle.png) |
+
+![Bars view ranking the largest directories by size](docs/screenshots/bars.png)
+
+> Screenshots use a synthetic demo dataset, not a real host.
 
 ## Features
 
