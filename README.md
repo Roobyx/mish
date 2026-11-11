@@ -100,10 +100,10 @@ docker compose up -d --build
 
 | Service | URL | Purpose |
 | --- | --- | --- |
-| `mish` | <http://localhost:8080> | API + web client (bundles the Rust core) |
+| `mish` | <http://localhost:9543> | API + web client (bundles the Rust core) |
 | `mish-site` | <http://localhost:3300> | Landing page and documentation |
 
-The app port is published on loopback only. Because the container itself binds `0.0.0.0:8080`, the
+The app port is published on loopback only. Because the container itself binds `0.0.0.0:9543`, the
 server generates an API token on first start. Read it and paste it into the web client when asked:
 
 ```bash
@@ -128,7 +128,7 @@ Publishing beyond loopback requires a token and an explicit Host allowlist:
 
 ```bash
 MISH_PUBLISH_ADDR=0.0.0.0 \
-MISH_BIND=0.0.0.0:8080 \
+MISH_BIND=0.0.0.0:9543 \
 MISH_AUTH_TOKEN="$(openssl rand -hex 32)" \
 MISH_ALLOWED_HOSTS=mish.lan \
 docker compose up -d
@@ -142,7 +142,7 @@ trusted proxy sets the forwarding headers.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MISH_DATA_DIR` | `./data` | Catalog, snapshots and journal |
-| `MISH_BIND` | `127.0.0.1:8080` | Server bind address; non-loopback requires a token |
+| `MISH_BIND` | `127.0.0.1:9543` | Server bind address; non-loopback requires a token |
 | `MISH_AUTH_TOKEN` | — | Bearer token for the API; auto-generated off-loopback |
 | `MISH_ALLOWED_HOSTS` | `localhost,127.0.0.1,[::1]` | Accepted `Host` headers (DNS-rebinding guard) |
 | `MISH_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` from a reverse proxy |

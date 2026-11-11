@@ -14,11 +14,11 @@ the API accordingly.
 
 ## Authentication and network exposure
 
-The server binds `127.0.0.1:8080` by default. A loopback bind may run without authentication; any
+The server binds `127.0.0.1:9543` by default. A loopback bind may run without authentication; any
 other bind requires a token. If `MISH_AUTH_TOKEN` is unset, the server generates one, persists
 it to `<dataDir>/auth-token` (mode `0600`). Set your own token for stable access.
 
-The compose files publish only on loopback by default, but the container listens on `0.0.0.0:8080`
+The compose files publish only on loopback by default, but the container listens on `0.0.0.0:9543`
 so Docker can forward the port. That non-loopback bind means the first visit asks for the generated
 token; read it with:
 
@@ -28,7 +28,7 @@ docker compose exec mish cat /data/auth-token
 
 For LAN access:
 
-1. Set `MISH_PUBLISH_ADDR=0.0.0.0` and `MISH_BIND=0.0.0.0:8080`.
+1. Set `MISH_PUBLISH_ADDR=0.0.0.0` and `MISH_BIND=0.0.0.0:9543`.
 2. Set a strong `MISH_AUTH_TOKEN` (`openssl rand -hex 32`). The API requires
    `Authorization: Bearer <token>`.
 3. Set `MISH_ALLOWED_HOSTS` to the hostname/IP clients use.

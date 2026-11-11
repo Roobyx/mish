@@ -12,11 +12,11 @@ filesystems into an immutable snapshot, then serves an interactive web client an
 docker compose up -d --build
 ```
 
-- Web client + API: <http://localhost:8080>
+- Web client + API: <http://localhost:9543>
 - Landing + docs: <http://localhost:3300>
 
 The compose file publishes on loopback by default, mounts a GET-only `docker-socket-proxy`, and
-runs the app as an unprivileged user. The container binds `0.0.0.0:8080` so Docker can forward the
+runs the app as an unprivileged user. The container binds `0.0.0.0:9543` so Docker can forward the
 port, so the first visit asks for the generated API token:
 
 ```bash
@@ -32,7 +32,7 @@ Open the web client and press **Scan**, or use the API. Roots must be inside `MI
 (the default is `/host`):
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/scans \
+curl -s -X POST http://localhost:9543/api/v1/scans \
   -H 'content-type: application/json' \
   -d '{"roots":["/host/etc"]}'
 ```

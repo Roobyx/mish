@@ -9,8 +9,8 @@ import type { CoreApi, CoreStatus } from "../src/core/client.js";
 function config(): ServerConfig {
   return {
     host: "127.0.0.1",
-    port: 8080,
-    bind: "127.0.0.1:8080",
+    port: 9543,
+    bind: "127.0.0.1:9543",
     dataDir: "/data",
     roots: ["/host"],
     dockerEnabled: false,

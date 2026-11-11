@@ -2,7 +2,7 @@
 #
 # Coolify's built-in proxy is not used. The app and site publish host ports and
 # an external reverse proxy routes:
-#   app.cats-on-a.quest      -> 127.0.0.1:8080
+#   app.cats-on-a.quest      -> 127.0.0.1:9543
 #   scanscan.cats-on-a.quest -> 0.0.0.0:3300
 #
 # Images are tagged for GHCR so a build can be pushed with `docker compose push`
@@ -15,10 +15,10 @@ services:
       dockerfile: deploy/docker/Dockerfile.server
     image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
     ports:
-      - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-8080}:8080"
+      - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-9543}:9543"
     environment:
       MISH_DATA_DIR: /data
-      MISH_BIND: 0.0.0.0:8080
+      MISH_BIND: 0.0.0.0:9543
       MISH_CORE_SOCKET: /run/mish/mish.sock
       MISH_ROOTS: ${MISH_ROOTS:-/host}
       MISH_HOST_ROOT: /host
@@ -39,7 +39,7 @@ services:
     depends_on:
       - docker-socket-proxy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9543/api/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 5

@@ -40,12 +40,12 @@ COPY --from=js-build /src/apps/web/dist ./web
 RUN mkdir -p /data /run/mish && chown -R mish:mish /data /run/mish /app
 
 ENV MISH_DATA_DIR=/data \
-    MISH_BIND=0.0.0.0:8080 \
+    MISH_BIND=0.0.0.0:9543 \
     MISH_WEB_DIR=/app/web \
     MISH_CORE_SOCKET=/run/mish/mish.sock \
     MISH_CORE_BIN=/usr/local/bin/mish
 
-EXPOSE 8080
+EXPOSE 9543
 VOLUME ["/data"]
 
 # Runs as the unprivileged `mish` user. Compose grants only
@@ -53,6 +53,6 @@ VOLUME ["/data"]
 USER mish
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
-  CMD wget -qO- http://127.0.0.1:8080/api/v1/health || exit 1
+  CMD wget -qO- http://127.0.0.1:9543/api/v1/health || exit 1
 
 CMD ["bun", "run", "/app/server/index.js"]

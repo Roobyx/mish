@@ -33,7 +33,7 @@ immutable index and answers "where did the space go?" from the CLI or the HTTP A
 
 ## Prerequisites
 
-- `mish` on `PATH`, or the HTTP API base URL (default `http://127.0.0.1:8080`).
+- `mish` on `PATH`, or the HTTP API base URL (default `http://127.0.0.1:9543`).
 - The core needs broad read access to the target paths (root or `CAP_DAC_READ_SEARCH`).
 
 ## Core workflow

@@ -13,17 +13,17 @@ docker compose up -d --build
 
 | Service               | Port   | Purpose                                                             |
 | --------------------- | ------ | ------------------------------------------------------------------- |
-| `mish`            | `8080` | API + web client (bundles the Rust core)                            |
+| `mish`            | `9543` | API + web client (bundles the Rust core)                            |
 | `mish-site`       | `3300` | Landing + docs (canonical 3000; override with `MISH_SITE_PORT`) |
 | `docker-socket-proxy` | —      | GET-only Docker API access                                          |
 
 The host filesystems are bind-mounted read-only, the app runs as an unprivileged user with only
 `CAP_DAC_READ_SEARCH`, and it never mounts `docker.sock` directly. The app port is published on
-loopback by default. The container binds `0.0.0.0:8080` so Docker can forward the port; if no
+loopback by default. The container binds `0.0.0.0:9543` so Docker can forward the port; if no
 `MISH_AUTH_TOKEN` is set, a token is generated in `/data/auth-token`. Read it with
 `docker compose exec mish cat /data/auth-token`.
 
-For LAN access, set `MISH_PUBLISH_ADDR=0.0.0.0`, `MISH_BIND=0.0.0.0:8080`, a strong
+For LAN access, set `MISH_PUBLISH_ADDR=0.0.0.0`, `MISH_BIND=0.0.0.0:9543`, a strong
 `MISH_AUTH_TOKEN` and `MISH_ALLOWED_HOSTS`; see [Security](/security/).
 
 ## Portainer

@@ -47,8 +47,8 @@ mish diff <older-snapshot> <newer-snapshot> --json
 ## 6. Agent HTTP flow
 
 ```bash
-curl -s http://127.0.0.1:8080/api/v1/scans -X POST \
+curl -s http://127.0.0.1:9543/api/v1/scans -X POST \
   -H 'content-type: application/json' \
   -d '{"roots":["/var"],"options":{"incremental":true}}'
-curl -s http://127.0.0.1:8080/api/v1/scans/<id>/top?n=20
+curl -s http://127.0.0.1:9543/api/v1/scans/<id>/top?n=20
 ```

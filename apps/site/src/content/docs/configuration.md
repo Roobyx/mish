@@ -8,7 +8,7 @@ description: Every environment variable, port, mount and scan option, with its d
 | Variable                  | Default                                  | Purpose                                                                       |
 | ------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
 | `MISH_DATA_DIR`       | `./data`                                 | Catalog, snapshots and journal                                                |
-| `MISH_BIND`           | `127.0.0.1:8080`                         | Server bind address; non-loopback requires a token                            |
+| `MISH_BIND`           | `127.0.0.1:9543`                         | Server bind address; non-loopback requires a token                            |
 | `MISH_AUTH_TOKEN`     | —                                        | Bearer token required by the API (required for non-loopback binds)            |
 | `MISH_ALLOWED_HOSTS`  | `localhost,127.0.0.1,[::1]`              | Accepted `Host` headers (DNS-rebinding guard)                                 |
 | `MISH_TRUST_PROXY`    | `false`                                  | Trust `X-Forwarded-Host`/`X-Forwarded-For` from a reverse proxy               |

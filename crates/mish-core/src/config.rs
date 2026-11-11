@@ -24,7 +24,7 @@ impl Default for Config {
         Self {
             data_dir: PathBuf::from("./data"),
             socket: PathBuf::from("/tmp/mish.sock"),
-            bind: "127.0.0.1:8080".to_string(),
+            bind: "127.0.0.1:9543".to_string(),
             roots: Vec::new(),
             docker_enabled: false,
         }

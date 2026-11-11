@@ -37,10 +37,10 @@ function readPackageVersion(): string {
 
 function parseBind(bind: string): { host: string; port: number } {
   const idx = bind.lastIndexOf(":");
-  if (idx === -1) return { host: bind, port: 8080 };
+  if (idx === -1) return { host: bind, port: 9543 };
   const host = bind.slice(0, idx) || "0.0.0.0";
   const port = Number.parseInt(bind.slice(idx + 1), 10);
-  return { host, port: Number.isFinite(port) ? port : 8080 };
+  return { host, port: Number.isFinite(port) ? port : 9543 };
 }
 
 function positiveInt(value: string | undefined, fallback: number): number {
@@ -59,7 +59,7 @@ function csv(value: string | undefined): string[] {
 export type EnvLike = Record<string, string | undefined>;
 
 export function readConfig(env: EnvLike = process.env): ServerConfig {
-  const bind = env.MISH_BIND ?? "127.0.0.1:8080";
+  const bind = env.MISH_BIND ?? "127.0.0.1:9543";
   const { host, port } = parseBind(bind);
   const roots = (env.MISH_ROOTS ?? "")
     .split(",")

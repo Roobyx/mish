@@ -160,7 +160,7 @@ export const faq = [
   },
   {
     q: "Is there authentication?",
-    a: "Not in v1. Bind it to localhost or put it behind a reverse proxy with TLS. Do not expose port 8080 directly to the internet.",
+    a: "Not in v1. Bind it to localhost or put it behind a reverse proxy with TLS. Do not expose port 9543 directly to the internet.",
   },
   {
     q: "Which platforms are supported?",
