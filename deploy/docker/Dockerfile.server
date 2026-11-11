@@ -42,7 +42,7 @@ COPY --from=js-build /src/apps/web/dist ./web
 # Docker's cap_add only fills the bounding set; a non-root user gets no
 # effective capabilities. Grant the read-search cap to the executables so the
 # unprivileged `mish` user can read the whole read-only host mount.
-RUN apk add --no-cache --virtual .cap-tools libcap \
+RUN apk add --no-cache --virtual .cap-tools libcap-setcap \
  && setcap cap_dac_read_search+ep /usr/local/bin/mish /usr/local/bin/bun \
  && apk del .cap-tools
 RUN mkdir -p /data /run/mish && chown -R mish:mish /data /run/mish /app
