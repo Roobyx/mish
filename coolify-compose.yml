@@ -10,6 +10,7 @@
 
 services:
   mish:
+    container_name: mish
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.server
@@ -47,6 +48,7 @@ services:
     restart: unless-stopped
 
   docker-socket-proxy:
+    container_name: mish-docker-socket-proxy
     image: tecnativa/docker-socket-proxy:v0.5.0
     environment:
       CONTAINERS: 1
@@ -59,6 +61,7 @@ services:
     restart: unless-stopped
 
   mish-site:
+    container_name: mish-site
     build:
       context: .
       dockerfile: deploy/docker/Dockerfile.site
