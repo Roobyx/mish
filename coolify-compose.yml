@@ -2,8 +2,8 @@
 #
 # Coolify's built-in proxy is not used. The app and site publish host ports and
 # an external reverse proxy routes:
-#   app.cats-on-a.quest      -> 127.0.0.1:9543
-#   scanscan.cats-on-a.quest -> 0.0.0.0:3300
+#   mish.cats-on-a.quest     -> 0.0.0.0:3300 (site)
+#   mish.cats-on-a.quest/app -> 127.0.0.1:9543 (app, built with MISH_WEB_BASE=/app/)
 #
 # Images are tagged for GHCR so a build can be pushed with `docker compose push`
 # and matches the release workflow.
