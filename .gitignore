@@ -1,0 +1,23 @@
+# Rust
+/target/
+**/target/
+
+# Node / JS
+node_modules/
+dist/
+build/
+.astro/
+.svelte-kit/
+*.tsbuildinfo
+
+# Env & local data
+.env
+.env.*
+!.env.example
+/data/
+*.sock
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

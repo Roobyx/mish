@@ -1,0 +1,802 @@
+//! Unix-domain-socket JSON-RPC 2.0 daemon.
+//!
+//! Newline-delimited requests; each yields one newline-delimited response.
+//! The protocol is versioned in `mish-ipc` and mirrored by the TS server.
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde_json::{json, Value};
+
+use mish_ipc::rpc::{codes, RpcError, RpcRequest, RpcResponse};
+use mish_ipc::{methods, ScanOptions, PROTOCOL_VERSION};
+
+use crate::config::Config;
+use crate::docker::DockerCollector;
+use crate::index::Kind;
+use crate::query::{FindFilters, Metric, QueryEngine, SortBy};
+use crate::store::Store;
+use crate::CORE_VERSION;
+
+/// JSON-RPC method dispatcher over a [`Store`].
+pub struct Daemon {
+    store: Arc<Store>,
+    config: Config,
+    /// Canonical roots the daemon is allowed to scan. Empty means deny all:
+    /// the network-facing daemon must not be able to index arbitrary paths.
+    allowed_roots: Vec<PathBuf>,
+    docker: Option<DockerCollector>,
+}
+
+impl Daemon {
+    pub fn new(store: Arc<Store>, config: Config) -> Self {
+        let allowed_roots: Vec<PathBuf> = config
+            .roots
+            .iter()
+            .filter_map(|root| match std::fs::canonicalize(root) {
+                Ok(path) => Some(path),
+                Err(error) => {
+                    tracing::warn!(root = %root, error = %error, "configured scan root is unavailable");
+                    None
+                }
+            })
+            .collect();
+        if allowed_roots.is_empty() {
+            tracing::warn!("no usable MISH_ROOTS; all scan requests will be rejected");
+        }
+        let docker = config.docker_enabled.then(DockerCollector::from_env);
+        Self {
+            store,
+            config,
+            allowed_roots,
+            docker,
+        }
+    }
+
+    fn docker(&self) -> Result<&DockerCollector, RpcError> {
+        self.docker.as_ref().ok_or_else(|| {
+            RpcError::new(
+                codes::INVALID_PARAMS,
+                "docker integration is disabled (set MISH_DOCKER=true)",
+            )
+        })
+    }
+
+    /// Reject roots outside the canonical allowlist. Canonicalizing resolves
+    /// symlinks, so a symlink inside an allowed root cannot point elsewhere.
+    fn check_roots(&self, roots: &[String]) -> Result<(), RpcError> {
+        if self.allowed_roots.is_empty() {
+            return Err(RpcError::new(
+                codes::INVALID_PARAMS,
+                "scan roots are not configured; set MISH_ROOTS",
+            ));
+        }
+        for root in roots {
+            let canonical = std::fs::canonicalize(root).map_err(|e| {
+                RpcError::new(codes::INVALID_PARAMS, format!("invalid root '{root}': {e}"))
+            })?;
+            let allowed = self
+                .allowed_roots
+                .iter()
+                .any(|base| canonical.as_path() == base.as_path() || canonical.starts_with(base));
+            if !allowed {
+                return Err(RpcError::new(
+                    codes::INVALID_PARAMS,
+                    format!("root '{root}' is outside the configured MISH_ROOTS"),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle one request, returning a response envelope.
+    pub fn dispatch(&self, req: &RpcRequest) -> RpcResponse {
+        match self.route(req) {
+            Ok(value) => RpcResponse::success(req.id, value),
+            Err(err) => RpcResponse::failure(req.id, err),
+        }
+    }
+
+    fn route(&self, req: &RpcRequest) -> Result<Value, RpcError> {
+        match req.method.as_str() {
+            methods::HEALTH => Ok(json!({
+                "status": "ok",
+                "core_version": CORE_VERSION,
+                "protocol": PROTOCOL_VERSION,
+            })),
+            methods::CONFIG_GET => Ok(json!({
+                "data_dir": self.config.data_dir.to_string_lossy(),
+                "socket": self.config.socket.to_string_lossy(),
+                "bind": self.config.bind,
+                "roots": self.config.roots,
+                "docker_enabled": self.config.docker_enabled,
+            })),
+            methods::HOST_MOUNTS => {
+                let host_root = crate::docker::host_root();
+                to_value(json!({
+                    "hostRoot": host_root,
+                    "mounts": crate::host::read_mounts(std::path::Path::new(&host_root)),
+                }))
+            }
+            methods::SCANS_CREATE => {
+                let p: ScansCreate = params(req)?;
+                let mut options = p.options.unwrap_or_else(|| ScanOptions::new(Vec::new()));
+                let roots = if options.roots.is_empty() {
+                    p.roots.unwrap_or_default()
+                } else {
+                    options.roots.clone()
+                };
+                self.check_roots(&roots)?;
+                options.roots = roots;
+                let summary = self.store.start(options).map_err(|e| {
+                    let code = match &e {
+                        crate::CoreError::Config(_) => codes::INVALID_PARAMS,
+                        _ => codes::INTERNAL_ERROR,
+                    };
+                    RpcError::new(code, e.to_string())
+                })?;
+                to_value(summary)
+            }
+            methods::SCANS_GET => {
+                let p: IdParam = params(req)?;
+                self.store
+                    .get(&p.id)
+                    .ok_or_else(|| RpcError::new(codes::NOT_FOUND, "scan not found"))
+                    .and_then(to_value)
+            }
+            methods::SCANS_LIST => {
+                let scans = self.store.list();
+                to_value(json!({ "scans": scans }))
+            }
+            methods::SCANS_CANCEL => {
+                let p: IdParam = params(req)?;
+                Ok(json!({ "cancelled": self.store.cancel(&p.id) }))
+            }
+            methods::SCANS_DELETE => {
+                let p: IdParam = params(req)?;
+                self.store.delete(&p.id).map_err(|e| {
+                    let code = match &e {
+                        crate::CoreError::Config(_) => codes::INVALID_PARAMS,
+                        _ => codes::INTERNAL_ERROR,
+                    };
+                    RpcError::new(code, e.to_string())
+                })?;
+                Ok(json!({ "deleted": true }))
+            }
+            methods::SCANS_PROGRESS => {
+                let p: IdParam = params(req)?;
+                self.store
+                    .progress(&p.id)
+                    .ok_or_else(|| RpcError::new(codes::NOT_FOUND, "scan not found"))
+                    .and_then(to_value)
+            }
+            methods::TREE_CHILDREN => {
+                let p: ChildrenParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let scope = p.scope.unwrap_or(0);
+                let (total, items) = q.children(
+                    scope,
+                    SortBy::parse(p.sort.as_deref().unwrap_or("size")),
+                    query_limit(p.limit, 500),
+                    p.offset.unwrap_or(0),
+                );
+                let records: Vec<_> = items.iter().map(|v| v.to_record()).collect();
+                to_value(json!({
+                    "parent": scope,
+                    "total": total,
+                    "offset": p.offset.unwrap_or(0),
+                    "items": records,
+                }))
+            }
+            methods::TREE_TILES => {
+                let p: TilesParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let tiles = q.tiles(
+                    p.scope.unwrap_or(0),
+                    query_depth(p.depth, 2),
+                    Metric::parse(p.metric.as_deref().unwrap_or("alloc")),
+                    p.color.as_deref().unwrap_or("ext"),
+                );
+                to_value(tiles)
+            }
+            methods::QUERY_TOP => {
+                let p: TopParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let items = q.top_n(
+                    p.scope.unwrap_or(0),
+                    p.kind.as_deref().and_then(parse_kind),
+                    Metric::parse(p.metric.as_deref().unwrap_or("alloc")),
+                    query_limit(p.n, 50),
+                );
+                let records: Vec<_> = items.iter().map(|v| v.to_record()).collect();
+                to_value(json!({ "items": records }))
+            }
+            methods::QUERY_HISTOGRAM => {
+                let p: HistParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let dim = p.dim.as_deref().unwrap_or("ext");
+                let buckets = q.histogram(p.scope.unwrap_or(0), dim);
+                Ok(json!({ "dim": dim, "items": buckets }))
+            }
+            methods::TREE_HIERARCHY => {
+                let p: HierarchyParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let scope = p.scope.unwrap_or(0);
+                let depth = query_depth(p.depth, 2);
+                let root = q.hierarchy(scope, depth, query_limit(p.limit, 2000));
+                Ok(json!({ "scope": scope, "depth": depth, "root": root }))
+            }
+            methods::QUERY_DUPLICATES => {
+                let p: DupParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let mode = p.mode.unwrap_or_else(|| "name+size".to_string());
+                let groups = q.duplicates(p.scope.unwrap_or(0), &mode, query_limit(p.limit, 200));
+                Ok(json!({ "mode": mode, "groups": groups }))
+            }
+            methods::QUERY_DIFF => {
+                let p: DiffParam = params(req)?;
+                let a = self.open(&p.a)?;
+                let b = self.open(&p.b)?;
+                to_value(crate::query::diff(&a, &b))
+            }
+            methods::QUERY_HEATMAP => {
+                let p: HistParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                to_value(q.heatmap(p.scope.unwrap_or(0)))
+            }
+            methods::SNAPSHOTS_GC => {
+                let p: GcParam = params(req)?;
+                let removed = self
+                    .store
+                    .gc(p.keep.unwrap_or(3).min(1000))
+                    .map_err(|e| RpcError::new(codes::INTERNAL_ERROR, e.to_string()))?;
+                Ok(json!({ "removed": removed }))
+            }
+            methods::QUERY_SEARCH => {
+                let p: FindParam = params(req)?;
+                let reader = self.open(&p.id)?;
+                let q = QueryEngine::new(&reader);
+                let filters = FindFilters {
+                    size_min: p.size_min,
+                    size_max: p.size_max,
+                    mtime_before: p.mtime_before,
+                    mtime_after: p.mtime_after,
+                    ext: p.ext,
+                    name_contains: p.name,
+                    kind: p.kind.as_deref().and_then(parse_kind),
+                    limit: query_limit(p.limit, 500),
+                };
+                let items = q.find(p.scope.unwrap_or(0), &filters);
+                let records: Vec<_> = items.iter().map(|v| v.to_record()).collect();
+                to_value(json!({ "items": records }))
+            }
+            methods::DOCKER_CONTAINERS => {
+                // Prefer sizes, but fall back to the size-free list so a slow
+                // size computation cannot empty the whole panel.
+                let params: ContainersParam = params(req)?;
+                let docker = self.docker()?;
+                let mut containers = docker
+                    .containers()
+                    .or_else(|_| docker.containers_raw())
+                    .unwrap_or_default();
+                // A single fetch serves both the container list and its mounts:
+                // when a snapshot is given, correlate the mounts already carried
+                // by each container instead of re-listing containers for mounts.
+                if let Some(id) = params.scan {
+                    let reader = self.open(&id)?;
+                    let host_root = crate::docker::host_root();
+                    let mut flat: Vec<_> =
+                        containers.iter().flat_map(|c| c.mounts.clone()).collect();
+                    flat = crate::query::correlate_mounts(&reader, flat, &host_root);
+                    let mut next = flat.into_iter();
+                    for container in &mut containers {
+                        let len = container.mounts.len();
+                        container.mounts = next.by_ref().take(len).collect();
+                    }
+                }
+                to_value(json!({ "containers": containers }))
+            }
+            methods::DOCKER_MOUNTS => {
+                let docker = self.docker()?;
+                to_value(json!({ "mounts": docker.mounts().unwrap_or_default() }))
+            }
+            methods::DOCKER_STATS => {
+                let docker = self.docker()?;
+                to_value(json!({ "containers": docker.stats().unwrap_or_default() }))
+            }
+            methods::DOCKER_IMAGES => {
+                let docker = self.docker()?;
+                to_value(json!({ "images": docker.images().unwrap_or_default() }))
+            }
+            methods::DOCKER_VOLUMES => {
+                let docker = self.docker()?;
+                to_value(json!({ "volumes": docker.volumes().unwrap_or_default() }))
+            }
+            methods::DOCKER_LOCATE => {
+                let p: LocateParam = params(req)?;
+                if p.query.len() > 1024 {
+                    return Err(RpcError::new(
+                        codes::INVALID_PARAMS,
+                        "docker locate query is too long",
+                    ));
+                }
+                let docker = self.docker()?;
+                to_value(json!({ "matches": docker.locate(&p.query).unwrap_or_default() }))
+            }
+            methods::DOCKER_MOUNTS_FOR => {
+                let p: IdParam = params(req)?;
+                let docker = self.docker()?;
+                let reader = self.open(&p.id)?;
+                let host_root = crate::docker::host_root();
+                let mounts = crate::query::correlate_mounts(
+                    &reader,
+                    docker.mounts().unwrap_or_default(),
+                    &host_root,
+                );
+                to_value(json!({ "mounts": mounts }))
+            }
+            methods::DOCKER_OVERLAY_CONTENTS => {
+                let p: OverlayContentsParam = params(req)?;
+                let layer = crate::docker::OverlayLayer::parse(&p.layer).ok_or_else(|| {
+                    RpcError::new(
+                        codes::INVALID_PARAMS,
+                        format!("unknown overlay layer '{}'", p.layer),
+                    )
+                })?;
+                let docker = self.docker()?;
+                let reader = self.open(&p.id)?;
+                let dirs = docker
+                    .overlay_layer_dirs(&p.container, layer)
+                    .unwrap_or_default();
+                let contents =
+                    crate::query::overlay_contents(&reader, &crate::docker::host_root(), &dirs);
+                to_value(contents)
+            }
+            "docker.status" => {
+                let status = match self.docker.as_ref() {
+                    Some(docker) => docker.status(),
+                    None => crate::docker::DockerStatus {
+                        available: false,
+                        socket: String::new(),
+                        error: Some("docker integration is disabled".into()),
+                    },
+                };
+                to_value(status)
+            }
+            _ => Err(RpcError::new(
+                codes::METHOD_NOT_FOUND,
+                format!("unknown method '{}'", req.method),
+            )),
+        }
+    }
+
+    fn open(&self, id: &str) -> Result<crate::index::IndexReader, RpcError> {
+        self.store
+            .open(id)
+            .map_err(|e| RpcError::new(codes::NOT_FOUND, e.to_string()))
+    }
+}
+
+#[derive(Deserialize)]
+struct ScansCreate {
+    #[serde(default)]
+    roots: Option<Vec<String>>,
+    #[serde(default)]
+    options: Option<ScanOptions>,
+}
+
+#[derive(Deserialize)]
+struct IdParam {
+    id: String,
+}
+
+/// `docker.containers` parameters. `scan` is optional: when set, the mounts
+/// already carried by each container are correlated against that snapshot in
+/// the same call, so the client needs a single request.
+#[derive(Deserialize)]
+struct ContainersParam {
+    #[serde(default)]
+    scan: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct OverlayContentsParam {
+    /// Snapshot id backing the index.
+    id: String,
+    /// Container whose overlay layer is explored.
+    container: String,
+    /// `upper`, `lower` or `merged`; an empty value means `upper`.
+    #[serde(default)]
+    layer: String,
+}
+
+#[derive(Deserialize)]
+struct ChildrenParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    sort: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    offset: Option<usize>,
+}
+
+#[derive(Deserialize)]
+struct TilesParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    depth: Option<u32>,
+    #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
+    metric: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct TopParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    n: Option<usize>,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    metric: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HistParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    dim: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HierarchyParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    depth: Option<u32>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize)]
+struct DupParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize)]
+struct DiffParam {
+    a: String,
+    b: String,
+}
+
+#[derive(Deserialize)]
+struct GcParam {
+    #[serde(default)]
+    keep: Option<usize>,
+}
+
+#[derive(Deserialize)]
+struct LocateParam {
+    query: String,
+}
+
+#[derive(Deserialize)]
+struct FindParam {
+    id: String,
+    #[serde(default)]
+    scope: Option<u32>,
+    #[serde(default)]
+    size_min: Option<u64>,
+    #[serde(default)]
+    size_max: Option<u64>,
+    #[serde(default)]
+    mtime_before: Option<i64>,
+    #[serde(default)]
+    mtime_after: Option<i64>,
+    #[serde(default)]
+    ext: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+/// Hard caps for query parameters. The HTTP server clamps too; the core keeps
+/// its own bounds so a direct UDS/CLI caller cannot exhaust memory.
+const MAX_QUERY_LIMIT: usize = 10_000;
+const MAX_TREE_DEPTH: u32 = 32;
+
+fn query_limit(value: Option<usize>, default: usize) -> usize {
+    value.unwrap_or(default).clamp(1, MAX_QUERY_LIMIT)
+}
+
+fn query_depth(value: Option<u32>, default: u32) -> u32 {
+    value.unwrap_or(default).clamp(1, MAX_TREE_DEPTH)
+}
+
+fn params<T: DeserializeOwned>(req: &RpcRequest) -> Result<T, RpcError> {
+    let value = req.params.clone().unwrap_or(Value::Null);
+    serde_json::from_value(value).map_err(|e| RpcError::new(codes::INVALID_PARAMS, e.to_string()))
+}
+
+fn to_value<T: serde::Serialize>(value: T) -> Result<Value, RpcError> {
+    serde_json::to_value(value).map_err(|e| RpcError::new(codes::INTERNAL_ERROR, e.to_string()))
+}
+
+fn parse_kind(s: &str) -> Option<Kind> {
+    match s {
+        "file" => Some(Kind::File),
+        "dir" | "directory" => Some(Kind::Directory),
+        "symlink" => Some(Kind::Symlink),
+        "special" => Some(Kind::Special),
+        _ => None,
+    }
+}
+
+/// Serve the daemon on a Unix socket until the process is stopped.
+#[cfg(unix)]
+pub fn serve(daemon: Arc<Daemon>, socket: &std::path::Path) -> crate::error::Result<()> {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixListener;
+
+    if let Some(parent) = socket.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::remove_file(socket);
+    let listener = UnixListener::bind(socket)?;
+    // Only the service user may talk to the core. The daemon exposes
+    // destructive snapshot operations, so the socket must not be group/world
+    // accessible.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(socket, std::fs::Permissions::from_mode(0o600))?;
+    }
+    tracing::info!(socket = %socket.display(), "mish core daemon listening");
+
+    for connection in listener.incoming() {
+        let Ok(stream) = connection else { continue };
+        let daemon = daemon.clone();
+        std::thread::spawn(move || {
+            let Ok(write_stream) = stream.try_clone() else {
+                return;
+            };
+            let reader = BufReader::new(stream);
+            // Process each request on its own thread and write responses under a
+            // lock, so a slow call (e.g. docker.stats) never blocks the others.
+            // Responses are matched by id, so ordering does not matter.
+            let writer = Arc::new(std::sync::Mutex::new(write_stream));
+            for line in reader.lines() {
+                let Ok(line) = line else { break };
+                if line.trim().is_empty() {
+                    continue;
+                }
+                // Bound the work a local client can force through one request.
+                if line.len() > 1_048_576 {
+                    break;
+                }
+                let daemon = daemon.clone();
+                let writer = Arc::clone(&writer);
+                std::thread::spawn(move || {
+                    let response = match serde_json::from_str::<RpcRequest>(&line) {
+                        Ok(req) => daemon.dispatch(&req),
+                        Err(e) => RpcResponse::failure(
+                            0,
+                            RpcError::new(codes::PARSE_ERROR, e.to_string()),
+                        ),
+                    };
+                    let mut bytes = match serde_json::to_vec(&response) {
+                        Ok(b) => b,
+                        Err(_) => return,
+                    };
+                    bytes.push(b'\n');
+                    if let Ok(mut w) = writer.lock() {
+                        let _ = w.write_all(&bytes);
+                        let _ = w.flush();
+                    }
+                });
+            }
+        });
+    }
+    Ok(())
+}
+
+/// Non-Unix builds cannot host a Unix-socket daemon.
+#[cfg(not(unix))]
+pub fn serve(_daemon: Arc<Daemon>, _socket: &std::path::Path) -> crate::error::Result<()> {
+    Err(crate::error::CoreError::Config(
+        "the daemon requires a unix domain socket".into(),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::index::{IndexWriter, Kind as IKind, ManifestSeed, NodeInput, NO_PARENT};
+
+    fn seeded_store() -> Arc<Store> {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = Store::new(tmp.path()).unwrap();
+        let dir = store.snapshot_path("snap1").unwrap();
+        let mut w = IndexWriter::create(&dir).unwrap();
+        let root = w
+            .push(NodeInput {
+                parent: NO_PARENT,
+                name: "root",
+                kind: IKind::Directory,
+                flags: 0,
+                children: 1,
+                size_app: 0,
+                size_alloc: 0,
+                mtime_ms: 0,
+                uid: 0,
+                gid: 0,
+                mode: 0,
+                ino: 0,
+                dev: 0,
+            })
+            .unwrap();
+        w.push(NodeInput {
+            parent: root,
+            name: "big.iso",
+            kind: IKind::File,
+            flags: 0,
+            children: 0,
+            size_app: 4096,
+            size_alloc: 8192,
+            mtime_ms: 0,
+            uid: 0,
+            gid: 0,
+            mode: 0,
+            ino: 0,
+            dev: 0,
+        })
+        .unwrap();
+        w.finish(ManifestSeed {
+            id: "snap1".into(),
+            parent_id: None,
+            roots: vec!["/x".into()],
+            started_at_ms: 0,
+        })
+        .unwrap();
+        // Leak the tempdir so the store remains valid for the test body.
+        std::mem::forget(tmp);
+        Arc::new(store)
+    }
+
+    #[test]
+    fn dispatches_health_and_queries() {
+        let store = seeded_store();
+        let daemon = Daemon::new(store, Config::default());
+
+        let health = daemon.dispatch(&RpcRequest::new(1, methods::HEALTH, None));
+        assert!(health.error.is_none());
+
+        let top = daemon.dispatch(&RpcRequest::new(
+            2,
+            methods::QUERY_TOP,
+            Some(json!({ "id": "snap1", "scope": 0, "n": 5 })),
+        ));
+        let result = top.result.expect("top result");
+        assert_eq!(result["items"][0]["name"], "big.iso");
+
+        let tiles = daemon.dispatch(&RpcRequest::new(
+            3,
+            methods::TREE_TILES,
+            Some(json!({ "id": "snap1", "scope": 0, "depth": 1 })),
+        ));
+        assert!(tiles.error.is_none());
+
+        let missing = daemon.dispatch(&RpcRequest::new(
+            4,
+            methods::SCANS_GET,
+            Some(json!({ "id": "nope" })),
+        ));
+        assert_eq!(missing.error.unwrap().code, codes::NOT_FOUND);
+    }
+
+    #[test]
+    fn rejects_scans_when_no_roots_are_configured() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = Arc::new(Store::new(tmp.path()).unwrap());
+        let daemon = Daemon::new(store, Config::default());
+        let response = daemon.dispatch(&RpcRequest::new(
+            1,
+            methods::SCANS_CREATE,
+            Some(json!({ "roots": [tmp.path().to_string_lossy().into_owned()] })),
+        ));
+        assert_eq!(response.error.unwrap().code, codes::INVALID_PARAMS);
+    }
+
+    #[test]
+    fn rejects_roots_outside_the_allowlist() {
+        let tmp = tempfile::tempdir().unwrap();
+        let allowed = tmp.path().join("allowed");
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&allowed).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        let store = Arc::new(Store::new(tmp.path().join("data")).unwrap());
+        let config = Config {
+            roots: vec![allowed.to_string_lossy().into_owned()],
+            ..Config::default()
+        };
+        let daemon = Daemon::new(store, config);
+        let response = daemon.dispatch(&RpcRequest::new(
+            1,
+            methods::SCANS_CREATE,
+            Some(json!({ "roots": [outside.to_string_lossy().into_owned()] })),
+        ));
+        assert_eq!(response.error.unwrap().code, codes::INVALID_PARAMS);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_escapes_from_an_allowed_root() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let allowed = tmp.path().join("allowed");
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&allowed).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, allowed.join("escape")).unwrap();
+        let store = Arc::new(Store::new(tmp.path().join("data")).unwrap());
+        let config = Config {
+            roots: vec![allowed.to_string_lossy().into_owned()],
+            ..Config::default()
+        };
+        let daemon = Daemon::new(store, config);
+        let response = daemon.dispatch(&RpcRequest::new(
+            1,
+            methods::SCANS_CREATE,
+            Some(json!({ "roots": [allowed.join("escape").to_string_lossy().into_owned()] })),
+        ));
+        assert_eq!(response.error.unwrap().code, codes::INVALID_PARAMS);
+    }
+
+    #[test]
+    fn docker_is_disabled_by_default() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = Arc::new(Store::new(tmp.path()).unwrap());
+        let daemon = Daemon::new(store, Config::default());
+
+        let status = daemon.dispatch(&RpcRequest::new(1, "docker.status", None));
+        let result = status.result.expect("docker status result");
+        assert_eq!(result["available"], false);
+
+        let containers = daemon.dispatch(&RpcRequest::new(
+            2,
+            methods::DOCKER_CONTAINERS,
+            Some(json!({})),
+        ));
+        assert_eq!(containers.error.unwrap().code, codes::INVALID_PARAMS);
+    }
+}

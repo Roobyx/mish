@@ -1,0 +1,74 @@
+# Portainer stack for mish.
+#
+# Deploy: Stacks -> Add stack -> paste/upload this file -> set the environment
+# variables below -> Deploy. See deploy/compose/.env.example for the variables.
+#
+# The app never mounts docker.sock directly. It talks to a GET-only socket
+# proxy; the proxy is the only service that touches the Docker socket.
+services:
+  mish:
+    image: mish/server:${MISH_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.server
+    ports:
+      # Loopback by default. For LAN access set MISH_PUBLISH_ADDR=0.0.0.0,
+      # MISH_BIND=0.0.0.0:8080 and a strong MISH_AUTH_TOKEN.
+      - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-8080}:8080"
+    environment:
+      MISH_DATA_DIR: /data
+      MISH_BIND: ${MISH_BIND:-0.0.0.0:8080}
+      MISH_CORE_SOCKET: /run/mish/mish.sock
+      MISH_ROOTS: ${MISH_ROOTS:-/host}
+      MISH_HOST_ROOT: /host
+      MISH_DOCKER: ${MISH_DOCKER:-true}
+      MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-false}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+      - mish-data:/data
+      # Each mounted filesystem is one card on the Drives dashboard; add another
+      # bind mount (e.g. /mnt/backup:/host/mnt/backup:ro) to list more drives.
+      - ${HOST_MOUNT:-/}:/host:ro
+    cap_drop:
+      - ALL
+    cap_add:
+      # Read/search only; the host mount stays read-only.
+      - DAC_READ_SEARCH
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - docker-socket-proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  mish-site:
+    image: mish/site:${MISH_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.site
+    ports:
+      - "${MISH_SITE_PORT:-3300}:80"
+    restart: unless-stopped
+
+  # GET-only Docker socket proxy. POST=0 blocks every mutating method.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      VOLUMES: 1
+      EVENTS: 0
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+volumes:
+  mish-data:

@@ -1,0 +1,26 @@
+{
+  "name": "@mish/site",
+  "version": "1.16.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "bun test",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.6.0",
+    "@astrojs/starlight": "^0.34.0",
+    "astro": "^5.0.0",
+    "gsap": "^3.13.0",
+    "lenis": "^1.3.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "axe-core": "^4.10.0",
+    "playwright": "^1.55.0",
+    "typescript": "^5.6.0"
+  }
+}

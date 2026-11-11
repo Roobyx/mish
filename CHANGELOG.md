@@ -1,0 +1,506 @@
+# Changelog
+
+All notable changes to mish are documented here. Newest entries first.
+
+## [1.16.1] - 2026-11-10
+
+### Security
+
+- **Snapshot IDs are validated as single path components** in the core, so the delete/open/get
+  paths can no longer escape the snapshots directory. This closes an unauthenticated arbitrary
+  directory deletion through `DELETE /api/v1/scans/:id`.
+- **The API is authenticated by default off loopback.** A non-loopback bind generates and persists
+  a bearer token in `<dataDir>/auth-token` (or uses `MISH_AUTH_TOKEN`); loopback binds may run
+  without auth. Added Host/Origin/CSRF checks, JSON content-type enforcement, body/rate limits,
+  security headers, and clamped query limits.
+- **`MISH_ROOTS` is enforced** as a canonical allowlist, `MISH_DOCKER=false` now disables
+  the Docker collector and routes, and the compose files use the GET-only socket proxy by default.
+  The container runs as the unprivileged `mish` user with only `CAP_DAC_READ_SEARCH`.
+- **CSV export neutralizes spreadsheet formulas**, the data directory is excluded canonically, and
+  the core socket is `0600`.
+
+### Version updates
+
+- Workspace crates and all apps 1.16.1; `Cargo.lock` and `bun.lock` are committed and the Docker
+  build is locked/frozen. Docker base images and the socket proxy are pinned.
+
+## [1.16.0] - 2026-10-23
+
+### Site
+
+- **The landing page at `/` is now a conversion page, not a splash.** It leads with a working
+  treemap of a labelled sample snapshot that drills into the clicked block, then a views tab panel,
+  a comparison table, a Docker sample, a copyable three-command install, a trust strip and an
+  operator FAQ. The docs index moved to `/overview/` and the docs are themed with the product
+  palette and self-hosted Supreme and Azeret Mono.
+- **Downloads are one action.** The install section copies the compose commands, links the
+  repository archive, Portainer stack and source build, and the footer repeats the command. The
+  page never promises a binary or image tag that is not published.
+- **The custom 404 is served by nginx.** `error_page 404 /404.html` replaces the default page, and
+  `SITE_URL` now drives canonical, OG and sitemap URLs (falling back to `http://localhost:3300`).
+
+### Version updates
+
+- `@mish/site` 1.15.4 → 1.16.0. Workspace crates and apps are unchanged.
+
+## [1.15.6] - 2026-10-23
+
+### Added
+
+- **The Drives dashboard now shows hardware and inode counters.** Each card gains a
+  Usage/Details switch; Details lists the kernel device, model, serial, SSD/HDD, bus,
+  filesystem, inode usage and cumulative read/write/busy counters, all read from sysfs and
+  `/proc/diskstats` with no extra privileges and no host `/dev` mount.
+- **Drive temperature appears on every card** when the host binds a hwmon sensor to the
+  disk, colour-coded above 55 °C and 70 °C.
+- **Filesystem type and source device are filled in** for discovered mounts from the
+  container's mount table, so the existing fstype pill is no longer empty.
+
+### Version updates
+
+- `@mish/web` and `@mish/server` 1.15.5 → 1.15.6; `@mish/api-types` 1.13.3 →
+  1.13.4.
+
+## [1.15.5] - 2026-10-21
+
+### Fixed
+
+- **Clicking a Docker container card threw a `ReferenceError`.** The card referenced an
+  undefined `toggleSideTreeForContainer` handler; the broken handler was removed.
+
+### Changed
+
+- **The Docker tab now fetches everything in one containers call.** `GET /api/v1/docker/containers`
+  accepts an optional `?scan=` parameter and correlates each container's mounts against the
+  snapshot in the same response, replacing the separate `/docker/mounts` request the panel used
+  (which fetched the container list a second time). The `docker.mounts` / `docker.mountsFor`
+  endpoints remain available for compatibility.
+- **Live stats are shown inside the container cards and table** as CPU/MEM meters instead of a
+  separate Stats section that re-listed container names.
+- **The Overlay layers table was merged into the Containers view** as explore buttons
+  (Upper/Lower/Merged) on each card and an Overlay column in the table, removing the duplicated
+  Name/Image/State/RW columns.
+
+### Version updates
+
+- `@mish/web` and `@mish/server` 1.15.4 → 1.15.5.
+
+## [1.15.4] - 2026-10-21
+
+### Fixed
+
+- **The web build was broken.** The explorable-containers work added `getDockerOverlayContents`
+  to the Docker panel without adding the function to the web API client, so `vite build` failed
+  with a missing export. The client function, the `GET /api/v1/docker/overlay-contents` server
+  route and the `docker.overlayContents` core method are now wired up end to end, so a container's
+  upper, lower and merged overlay layers can be explored from the Docker panel.
+- **`usageColor` failed type checking.** The colour-stop lookup indexed the stop array directly,
+  which `noUncheckedIndexedAccess` rejects; it now walks the stops without indexing.
+
+### Added
+
+- **`ContainerOverlayContents` IPC type** and the `docker.overlayContents` core method, which
+  resolve a container's overlay layer directories against a snapshot and report the layer node,
+  its total size and its children.
+
+### Changed
+
+- `@mish/web` 1.15.2 → 1.15.4; `@mish/api-types` 1.13.2 → 1.13.3; `@mish/server` 1.15.3 → 1.15.4; `@mish/site` 1.15.3 → 1.15.4; workspace crates 1.15.3 → 1.15.4.
+
+## [1.15.3] - 2026-10-21
+
+### Added
+
+- **`ContainerInfo.displayName`.** Docker containers are now shown with a meaningful name rather than the raw Docker Compose ID: `com.docker.compose.service` is preferred over `coolify.serviceName` or `coolify.name`, falling back to the container's raw name.
+
+### Changed
+
+- `@mish/web` 1.15.1 → 1.15.2; `@mish/api-types` 1.13.1 → 1.13.2; `@mish/server` 1.13.0 → 1.15.3; `@mish/site` 1.12.0 → 1.15.3; workspace crates 1.15.2 → 1.15.3.
+
+## [1.15.2] - 2026-10-21
+
+### Added
+
+- **Docker container views and sorting.** The containers section now offers a Cards or Table view, and containers can be sorted by size, date created, or running state, with a sort-direction toggle.
+- **`ContainerInfo.created`.** The Docker container summary now exposes the container creation timestamp (from the Engine API `Created` field), surfaced as a "Created" age in the UI.
+
+### Changed
+
+- `@mish/web` 1.15.0 → 1.15.1; `@mish/api-types` 1.13.0 → 1.13.1; workspace crates 1.15.1 → 1.15.2.
+
+## [1.15.1] - 2026-10-20
+
+### Fixed
+
+- **Docker image build was broken.** The Rust stage of `Dockerfile.server` did not compile:
+  `LinuxFs::read_dir` handed the `Result` of `entry.metadata()` to `PortableFs::meta_for`, which
+  takes a `Metadata`, and the TUI loop passed an owned line to `tui::parse_nav`, which takes `&str`.
+- `cargo build --release --bin mish` and `cargo test --workspace --release` pass again, so the
+  core, server and web stages of the image build can run.
+
+## [1.15.0] - 2026-10-19
+
+### Added
+
+- **Linux fast path (`LinuxFs`).** A directory is now read in one syscall: the `statx` that the
+  directory entry already carries is reused instead of `lstat`-ing every entry a second time.
+  `PortableFs` remains the portable fallback, and a test asserts that both walkers produce the
+  same node count and apparent bytes on the same fixture.
+- **`mish tui [path]`** — an interective terminal view of the children of a path: sized bars,
+  a breadcrumb and a footer of keys. It reads one line command at a time (page down/up, parent,
+  root, open child, sort, metric, wider/narrower, quit), so it works over SSH, inside a pipe and
+  on terminals with no termios layer. `--json` emits one page and exits.
+- `mish export --format csv`, with the same columns and quoting as the server's CSV export.
+- **New scan modal and Settings page.** New scan now opens as an overlay. Settings holds the API and
+  core connection status plus a Scan management table for selecting, exporting, deleting and
+  garbage-collecting snapshots.
+- **Linux system mounts.** `/tmp`, `/var/log` and `/boot/efi` always sort last in mount lists, are
+  muted and carry a "System mount point" label; `/` is shown as "Absolute root".
+- **Header refresh and branding.** A custom snapshot switcher with coloured state badges, icon-led
+  controls, and the Mish logo as the favicon.
+
+### Changed
+
+- `human_size` moved into the terminal-view module so the CLI listings and the TUI format sizes
+  identically.
+
+- The header now only carries the snapshot switcher, **+ New scan**, the Size/Extension filter and
+  Settings; delete, export and GC moved into Settings, and search moved to the view bar.
+
+### Known gaps
+
+- Parquet export is still not written: it needs a Parquet writer crate that resolves at build
+  time. `--format parquet` fails with that reason instead of a generic message.
+
+## [1.14.0] - 2026-10-19
+
+### Added
+
+- **Loading indicators across the web client.** Selecting another snapshot veils the shell
+  with a semi-transparent spinner overley that lifts once the new tiles arrive; the tree panel
+  shows a spinner in the row of each folder being opened plus a strip while it loads; the
+  treemap, hierarchy and chart views, drives, Docker, duplicates, diff, search, schedules and
+  the launcher each show a spinner while their data loads or refreches.
+- `Spinner` component (size + assistive label) is the single spinner used everywhere, so the
+  animation and colours live in one place.
+
+## [1.13.0] - 2026-10-19
+
+### Added
+
+- **Drives dashboard, and it is now the default view.** The app opens on one card per host
+  filesystem: a usage bar with free/used text (Windows Explorer style), the filesystem type, the
+  newest snapshot's size and age, and Open/Scan actions. `GET /api/v1/host/drives` takes the host
+  mounts from the core and enriches each with `statfs` capacity, keeping one card per device (the
+  shortest host path wins) and falling back to the configured root with a warning while the core
+  is down.
+- `formatAgo` in the web client formats the snapshot age shown on each card, with unit tests.
+- **The right panel is now a tree of the whole snapshot.** It is always rooted at the root the scan
+  started from (not at the folder you drilled into), loads levels lazily, keeps the walked path
+  expanded, highlights the current scope, and stays virtualized. Sort toggles now order siblings.
+- **File and folder icons** (small SVGs, file icons tinted by extension) replace the Kind column.
+- **Drive stats in the chart panel head**: a usage bar with free, total and used percentage for the
+  filesystem the selected snapshot came from.
+
+### Changed
+
+- **New scan** now opens the launcher inside the dashboard instead of blanking the selection, and
+  the launcher is offered automatically while no snapshot exists yet.
+- Host drives are loaded once by the app shell and shared by the Drives dashboard and the chart
+  panel head instead of being fetched per component.
+
+### Fixed
+
+- **Chart tooltips were cut off at the right and bottom edges.** Treemap, sunburst and bubble
+  tooltips now flip to the other side of the cursor when the default below-right offset would
+  leave the chart box. They are anchored by their own right/bottom edge (`lib/tooltip.ts`), so the
+  placement needs no measurement and stays stable while moving between tiles.
+
+## [1.12.0] - 2026-10-05
+
+### Added
+
+- **Duplicate file paths with copy-to-clipboard.** Expanding a group in the Duplicates tab now
+  lists the full filesystem path of every matching file, each with a Copy button. The core
+  resolves the absolute path from the snapshot's canonical root and returns it as
+  `NodeRecord.path`; the copy helper falls back to a hidden textarea on non-secure (plain HTTP)
+  origins where `navigator.clipboard` is unavailable.
+
+## [1.11.2] - 2026-10-05
+
+### Fixed
+
+- **Duplicates returned no response on very large snapshots.** It allocated a `Vec` per
+  file (millions of allocations); it now counts matches first and only collects node ids
+  for keys that actually repeat.
+- **Slow core queries were cut off mid-request.** The Bun server's default 10s idle
+  timeout closed long-running requests (Duplicates, Diff) before the response was written;
+  it is now 120s.
+
+## [1.11.1] - 2026-10-05
+
+### Fixed
+
+- **Overlay2 labels never appeared.** The core's Docker HTTP client used a 5s read timeout,
+  which `GET /containers/json?size=1` exceeds on a busy host (`os error 11`), so the
+  container list came back empty and no labels were attached. The timeout is now 30s, and
+  label/mount/locate paths use a size-free container list; the Docker panel falls back to
+  that list when sizing is slow.
+- **Duplicates and Diff returned 502 on large snapshots.** `diff` rebuilt file paths with
+  `IndexReader::children` for every directory, which is O(n·depth); it now reconstructs
+  paths in a single pre-order pass. `duplicates` keys on borrowed names instead of
+  allocating a `String` per file.
+
+## [1.11.0] - 2026-10-05
+
+### Added
+
+- **Docker overlay2 labels.** Scans now annotate `/var/lib/docker/overlay2/<id>`
+  directories with the container, image and compose stack/service that own them (read from
+  each container's `GraphDriver` layer paths and Docker labels). The label appears in the
+  treemap canvas and tooltip and in the ranked table's Kind column, so id-based overlay
+  folders are identifiable at a glance. Shared image layers show `shared by N containers`.
+- The snapshot index gains an interned `labels` table and a `label_id` on each node record
+  (format v3). The record stays 64 bytes by using previously-unused padding, and v2 snapshots
+  remain readable (their padding decodes to "no label"). The upgrade is one-way: a pre-1.11
+  build rejects v3 snapshots, so rolling the container back requires a rescan.
+
+## [1.10.1] - 2026-10-05
+
+### Fixed
+
+- The core daemon is now supervised. If it dies on its own (e.g. an OOM kill) the server
+  respawns it with a capped backoff and reconnects automatically, instead of leaving a stale
+  socket behind that made every request fail with `ECONNREFUSED /run/mish/mish.sock`
+  until the container was recreated.
+- The treemap sized directories as 0 bytes, so folders — and everything under them — vanished
+  and the map disagreed with the hierarchy charts. Directory tiles and the ranked table now use
+  the directory's subtree size, and the flat treemap renders the current scope's children so it
+  matches the other views.
+
+## [1.10.0] - 2026-10-03
+
+### Added
+
+- Docker **locate**: paste a host path or an id fragment (e.g. an overlay2 layer id like
+  `ff50410b…`) into the Docker panel and it reports the container/stack that owns it. It matches
+  container mounts and each container's overlay (GraphDriver) upper/lower/merged directories.
+  API: `GET /api/v1/docker/locate?q=`.
+
+## [1.9.3] - 2026-10-03
+
+### Fixed
+
+- The Docker tab returned HTTP 502 while scans were running. The core daemon processed requests
+  sequentially per connection, so a slow Docker call (stats across many containers) blocked the
+  shared connection until the server timed out. Each request now runs on its own thread, and
+  responses are written under a lock (matched by id, so ordering does not matter).
+
+## [1.9.2] - 2026-10-03
+
+### Added
+
+- The scan form now exposes **exclusions** (gitignore-style globs) and an **"include other mounted
+  filesystems"** toggle. By default a scan stops at filesystem boundaries, so scanning `/host`
+  scans only the root filesystem and skips separately-mounted drives (`/mnt/piDrive`, etc.).
+
+## [1.9.1] - 2026-10-03
+
+### Added
+
+- A per-scan **Delete** button in the header, so individual snapshots can be removed from the UI
+  (previously only GC was available).
+
+### Changed
+
+- Reverted the experimental Parquet export: its dependency failed to resolve at build time, so it
+  will return with a working approach.
+
+## [1.9.0] - 2026-10-03
+
+### Added
+
+- Content-addressed block store (ADR-2). The writer chunks the fixed-size columns (nodes, subtree,
+  inode) into 64K-node zstd-compressed blocks stored under `snapshots/blocks/<ab>/<hash>`, addressed
+  by BLAKE3 and deduplicated. The manifest records block references; the reader decompresses blocks
+  on demand with a small cache. Pre-CAS snapshots fall back to memory-mapped columns.
+- `snapshots gc` now also sweeps CAS blocks no longer referenced by any live manifest.
+
+## [1.8.0] - 2026-10-03
+
+### Added
+
+- Incremental rescans (`--incremental` / `options.incremental`). Snapshots now carry an inode
+  column (`ino`+`dev` per node, format v2), and a rescan reuses any directory whose `(mtime, inode)`
+  is unchanged by copying its subtree from the previous snapshot instead of re-reading the
+  filesystem. Format v1 snapshots remain readable (the inode column is optional).
+
+## [1.7.0] - 2026-10-02
+
+### Added
+
+- OpenAPI 3 document served at `GET /api/v1/openapi.json`, describing every endpoint (core, scans,
+  tree, query, docker, schedules) for the web client and the docs site.
+
+## [1.6.0] - 2026-10-02
+
+### Added
+
+- Scheduled scans: a server-side cron scheduler (`GET/POST/DELETE /api/v1/schedules`) that
+  triggers scans on a 5-field cron expression, plus a Schedules view to add, list and delete
+  schedules.
+
+## [1.5.1] - 2026-10-02
+
+### Fixed
+
+- `docker.mountsFor` could hang: resolving each mount via `IndexReader::children` was O(subtree)
+  per call, making N mounts O(N·n). It now builds a parent→children index once and computes each
+  distinct node's subtree bytes once.
+
+## [1.5.0] - 2026-10-02
+
+### Added
+
+- Docker image and volume sizes: `docker.images` / `GET /api/v1/docker/images` and `docker.volumes`
+  / `GET /api/v1/docker/volumes`, shown in the Docker panel as images and volumes tables.
+- Mount → index correlation: `docker.mountsFor` / `GET /api/v1/docker/mounts?scan=<id>` resolves
+  each container mount's host path to a snapshot node (with subtree bytes). The Docker panel shows
+  the node and clicking it drills the dashboard to that path.
+
+## [1.4.0] - 2026-10-02
+
+### Added
+
+- Age × size heatmap view: `query.heatmap` / `GET /api/v1/scans/:id/heatmap`
+  bins every file by age bucket (from `<1d` to `>3y`) and size bucket (from `0-1 KB` to `>1 GB`);
+  the web client renders it as a heatmap with per-cell file count and bytes.
+
+## [1.3.0] - 2026-10-02
+
+### Added
+
+- Global scan progress: a floating panel (bottom-right) shows running scans with live file/dir/
+  byte counts and the current path, visible from every view. Starting a scan no longer blocks the
+  form; the dashboard navigates to the snapshot when the scan finishes.
+
+### Fixed
+
+- Host drive discovery no longer reads `/proc/mounts`, which reflects the container's namespace
+  even when bind-mounted. It now walks the read-only `/host` mount and detects mount points by
+  device changes, so the picker lists the host's real filesystems.
+
+## [1.2.1] - 2026-10-02
+
+### Fixed
+
+- The host drive picker listed the container's mounts instead of the host's. The stack now mounts
+  the host's `/proc/mounts` at `/host.mounts` (`MISH_HOST_MOUNTS`) and prefers it when reading
+  mounts.
+
+## [1.2.0] - 2026-10-02
+
+### Added
+
+- Host drive picker in the scan form: `host.mounts` (GET `/api/v1/host/mounts`) reads the host
+  mount table under `/host/proc/mounts`, filters to real block-backed filesystems, and maps each
+  host mountpoint to its container path. The **Start a scan** panel lists the drives and fills the
+  root when one is chosen, and explains that the host is mounted read-only at `/host`.
+- `MISH_HOST_ROOT` (default `/host`) to configure the host mount location.
+
+## [1.1.0] - 2026-10-02
+
+### Added
+
+- Host filesystem scanning. The compose stack bind-mounts the host read-only at `/host`
+  (`HOST_MOUNT`) and defaults `MISH_ROOTS` to `/host`; the scan form pre-fills the configured
+  roots. The app container runs as root so the core can read the whole host (read-only).
+
+### Changed
+
+- Pseudo-filesystem exclusions (`proc`, `sys`, `dev`, `run`, `snap`) are now applied under every
+  root, not only `/`.
+
+## [1.0.1] - 2026-10-02
+
+### Fixed
+
+- The dashboard had no visible way to start a new scan once a completed scan was auto-selected.
+  Added an always-visible **+ New scan** button in the header.
+
+## [1.0.0] - 2026-10-02
+
+### Added
+
+- Phase 4: Astro + Starlight documentation site — a splash landing page plus getting started,
+  installation, web UI, CLI, HTTP API, Docker, agent-skill, architecture, configuration, security
+  and troubleshooting pages.
+- Release workflow (manual `workflow_dispatch`) producing multi-arch (linux/amd64, linux/arm64)
+  images pushed to GHCR.
+
+### Changed
+
+- The CI workflow is manual-only (`workflow_dispatch`) until GitHub Actions is configured for the
+  repository.
+
+## [0.4.0] - 2026-10-02
+
+### Added
+
+- Phase 3: metadata duplicate detection (name+size, optionally +mtime) with wasted-space ranking,
+  exposed via `query.duplicates`, `GET /scans/:id/duplicates`, `mish find --dupe`, and a
+  Duplicates view.
+- Snapshot diff/trend: `query.diff` joins two snapshots by relative path and reports
+  grown/shrunk/added/removed with totals; exposed via `GET /scans/:id/diff/:otherId`, `mish
+diff`, and a Diff view.
+- Snapshot garbage collection (`snapshots.gc`, `POST /api/v1/gc`, `mish snapshots gc`) that
+  keeps the newest N completed snapshots.
+
+## [0.3.0] - 2026-10-02
+
+### Added
+
+- Phase 2 views: sunburst, icicle, bubble, ranked bars, size histogram, and extension/age/owner
+  breakdowns, alongside the treemap; a Docker dashboard with container cards, mounts and live
+  stats; and a search/filter panel.
+- URL-addressable state (`#view=…&scope=…&color=…&q=…`), a virtualized ranked table, and CSV/JSON
+  export.
+- Backend: histogram dimensions (`ext|age|owner|size`), bounded hierarchy for radial/icicle/bubble
+  layouts, Docker non-streaming stats, and `uid`/`gid`/`mode` capture in the scanner.
+- Least-privilege Docker access: the collector accepts `unix://` and `tcp://` endpoints, and the
+  reference stack ships a GET-only `docker-socket-proxy` sidecar instead of mounting `docker.sock`.
+
+### Changed
+
+- The IPC/HTTP wire types now serialize camelCase, matching `packages/api-types` and the web client
+  (previously snake_case, which the browser could not read).
+
+## [0.2.0] - 2026-10-02
+
+### Added
+
+- Phase 1 MVP: streaming pre-order Rust scanner with parallel `stat`, hardlink dedup, sparse-file
+  and mount-boundary flags, exclusions (glob + pseudo-fs defaults), per-entry error recording, and
+  throttled progress.
+- Snapshot index format v1 (`manifest.json` + mmap'd `nodes.bin`/`names.bin`/`subtree.bin`) with
+  `subtree_size` computed on the way back up, plus a query engine (children, top-N, extension
+  histogram, depth-limited tiles) and a squarified treemap layout (area/overlap property tests).
+- UDS JSON-RPC daemon (`scans.*`, `tree.*`, `query.*`, `docker.*`) and a full CLI
+  (`scan|daemon|ls|du|top|find|tree|ext|diff|docker|export|snapshots|config`).
+- Read-only Docker Engine API collector (containers, sizes, mounts) over the Unix socket.
+- Server REST/SSE wiring to the core over a persistent UDS JSON-RPC client, and a Svelte 5 web
+  client: canvas treemap with drill-down, ranked table, breadcrumbs, and a scan launcher.
+
+## [0.1.0] - 2026-10-02
+
+### Added
+
+- Phase 0 foundation: Rust workspace (`mish-core`, `mish-cli`, `mish-ipc`) with the
+  `Filesystem` abstraction, configuration, and the JSON-RPC 2.0 protocol types.
+- TypeScript monorepo: Bun + Hono API server (`/api/v1/health|version|config`), Svelte 5 + Vite
+  web client shell, and an Astro landing site.
+- `packages/api-types` shared wire types with tests.
+- Docker: multi-stage `Dockerfile.server` (Rust core + server + web) and `Dockerfile.site`
+  (Astro + nginx), plus the root `docker-compose.yml` used by the Portainer stack.
+- CI workflow (Rust fmt/clippy/test, TypeScript lint/check/test/build, Docker image builds).
+- Agent skill skeleton (`skills/mish/`) and the first ADR.
