@@ -11,8 +11,9 @@
 services:
   mish:
     # Docker's cap_add only fills the bounding set, so a non-root user gets no
-    # effective capabilities. Run as root with only CAP_DAC_READ_SEARCH so the
-    # core and Bun can read hosts whose /mnt is not world-readable.
+    # effective capabilities. Run as root with the read-search and DAC-override
+    # caps so the core and Bun can read hosts whose /mnt is not world-readable
+    # and write their own mish-owned data directory.
     user: "0:0"
     build:
       context: .
@@ -40,6 +41,7 @@ services:
       - ALL
     cap_add:
       - DAC_READ_SEARCH
+      - DAC_OVERRIDE
     security_opt:
       - no-new-privileges:true
     depends_on:
