@@ -183,7 +183,7 @@
 
   .toggle button.active {
     background: var(--accent);
-    color: #0b0e14;
+    color: var(--accent-contrast);
   }
 
   .summary {

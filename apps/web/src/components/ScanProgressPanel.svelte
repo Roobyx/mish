@@ -85,7 +85,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--panel);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-md);
   }
 
   .row {

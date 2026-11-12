@@ -233,7 +233,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--panel);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
     list-style: none;
   }
 
@@ -291,7 +291,11 @@
 
   @media (max-width: 720px) {
     .trigger {
-      max-width: 14rem;
+      max-width: 11rem;
+    }
+
+    .trigger > .state {
+      display: none;
     }
 
     .menu {

@@ -5,9 +5,11 @@
   import { formatAgo, formatBytes } from "../lib/format.js";
   import { scanRootLabel } from "../lib/mounts.js";
   import { stateMeta } from "../lib/scan-state.js";
+  import type { ThemeId } from "../lib/theme.js";
 
   import Icon from "./Icon.svelte";
   import Modal from "./Modal.svelte";
+  import ThemeGrid from "./ThemeGrid.svelte";
 
   interface Props {
     scans: ScanSummary[];
@@ -15,11 +17,23 @@
     drives: DriveInfo[];
     health: HealthResponse | null;
     healthError: string | null;
+    theme: ThemeId;
+    ontheme: (id: ThemeId) => void;
     onopen: (scanId: string) => void | Promise<void>;
     onchanged: () => Promise<void>;
   }
 
-  let { scans, selectedId, drives, health, healthError, onopen, onchanged }: Props = $props();
+  let {
+    scans,
+    selectedId,
+    drives,
+    health,
+    healthError,
+    theme,
+    ontheme,
+    onopen,
+    onchanged,
+  }: Props = $props();
 
   let checked = $state<Set<string>>(new Set());
   let busy = $state(false);
@@ -118,10 +132,7 @@
 
 <div class="settings">
   <div class="settings-head">
-    <div>
-      <h1>Settings</h1>
-      <p>Runtime status and snapshot management.</p>
-    </div>
+    <p>Runtime status and snapshot management.</p>
   </div>
 
   <section class="panel">
@@ -195,6 +206,17 @@
         </p>
       </article>
     </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div class="title">
+        <Icon name="palette" size={15} />
+        <h2>Appearance</h2>
+      </div>
+      <span class="muted">stored in this browser</span>
+    </div>
+    <ThemeGrid {theme} onselect={ontheme} />
   </section>
 
   <section class="panel">
@@ -402,25 +424,20 @@
     overflow: auto;
   }
 
-  .settings-head h1 {
-    margin: 0;
-    font-size: 1.2rem;
-    letter-spacing: 0.01em;
-  }
-
   .settings-head p {
-    margin: 0.2rem 0 0;
+    margin: 0;
     color: var(--muted);
     font-size: 0.78rem;
   }
 
   .panel {
     display: flex;
+    flex: none;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: var(--panel);
   }
 
@@ -429,9 +446,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    min-height: 2.6rem;
-    padding: 0.6rem 0.75rem;
+    min-height: 2.9rem;
+    padding: 0.5rem 0.7rem;
     border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--panel) 92%, var(--panel-2));
   }
 
   .title {

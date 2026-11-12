@@ -81,7 +81,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--panel);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-lg);
   }
 
   h1 {
@@ -122,7 +122,7 @@
     border: 0;
     border-radius: 8px;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-contrast);
     font: inherit;
     font-weight: 600;
     cursor: pointer;

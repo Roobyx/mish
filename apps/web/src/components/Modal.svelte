@@ -76,7 +76,7 @@
     display: grid;
     place-items: center;
     padding: 1rem;
-    background: color-mix(in srgb, #05070b 68%, transparent);
+    background: var(--overlay);
     backdrop-filter: blur(3px);
   }
 
@@ -90,7 +90,7 @@
     border-radius: 14px;
     background: var(--panel);
     box-shadow:
-      0 24px 70px rgba(0, 0, 0, 0.55),
+      var(--shadow-lg),
       0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
     animation: enter 140ms ease-out;
   }

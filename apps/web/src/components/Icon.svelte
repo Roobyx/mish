@@ -93,5 +93,69 @@
     />
   {:else if name === "thermometer"}
     <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" />
+  {:else if name === "chevron-left"}
+    <path d="m15 18-6-6 6-6" />
+  {:else if name === "chevron-right"}
+    <path d="m9 18 6-6-6-6" />
+  {:else if name === "x"}
+    <path d="M18 6 6 18M6 6l12 12" />
+  {:else if name === "menu"}
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  {:else if name === "list"}
+    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+  {:else if name === "box"}
+    <path d="m21 8-9-5-9 5v8l9 5 9-5V8Z" />
+    <path d="m3 8 9 5 9-5M12 13v8" />
+  {:else if name === "copy"}
+    <rect x="8" y="8" width="12" height="12" rx="2" />
+    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+  {:else if name === "treemap"}
+    <rect x="3" y="3" width="8" height="8" rx="1" />
+    <rect x="13" y="3" width="8" height="5" rx="1" />
+    <rect x="13" y="10" width="8" height="11" rx="1" />
+    <rect x="3" y="13" width="8" height="8" rx="1" />
+  {:else if name === "layers"}
+    <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+    <path d="m3 12 9 5 9-5M3 17l9 5 9-5" />
+  {:else if name === "bubbles"}
+    <circle cx="8" cy="8" r="4" />
+    <circle cx="17" cy="7" r="3" />
+    <circle cx="15" cy="16" r="5" />
+    <circle cx="6" cy="17" r="2" />
+  {:else if name === "bar-chart"}
+    <path d="M3 3v18h18" />
+    <path d="M7 17v-4M12 17V8M17 17v-6" />
+  {:else if name === "activity"}
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+  {:else if name === "grid"}
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+  {:else if name === "users"}
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+  {:else if name === "git-compare"}
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="18" cy="18" r="3" />
+    <path d="M13 6h3a2 2 0 0 1 2 2v7M11 18H8a2 2 0 0 1-2-2V9" />
+  {:else if name === "calendar"}
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  {:else if name === "palette"}
+    <path
+      d="M12 2a10 10 0 0 0 0 20 2 2 0 0 0 2-2 2 2 0 0 1 2-2h2a4 4 0 0 0 4-4 10 10 0 0 0-10-10Z"
+    />
+    <circle cx="13.5" cy="6.5" r=".5" />
+    <circle cx="17.5" cy="10.5" r=".5" />
+    <circle cx="8.5" cy="7.5" r=".5" />
+    <circle cx="6.5" cy="12.5" r=".5" />
+  {:else if name === "info"}
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4M12 8h.01" />
+  {:else if name === "alert-triangle"}
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <path d="M12 9v4M12 17h.01" />
   {/if}
 </svg>

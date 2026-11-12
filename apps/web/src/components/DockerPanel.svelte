@@ -888,7 +888,7 @@
     border: 1px solid var(--accent);
     border-radius: 6px;
     background: var(--accent);
-    color: #0b0e14;
+    color: var(--accent-contrast);
     font: inherit;
     font-weight: 600;
     cursor: pointer;
