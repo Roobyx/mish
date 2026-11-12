@@ -42,9 +42,10 @@ export interface Theme {
 }
 
 export const DEFAULT_THEME: Theme = {
+  // The id is kept as "coolify" so existing localStorage selections keep working.
   id: "coolify",
-  name: "Coolify",
-  description: "Neutral near-black surfaces with a teal accent.",
+  name: "Forest",
+  description: "Near-black surfaces with a forest-teal accent.",
   mode: "dark",
   vars: {
     "--bg": "#0a0a0b",
