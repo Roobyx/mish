@@ -29,7 +29,7 @@ export const THEME_VARS = [
 
 export type ThemeVar = (typeof THEME_VARS)[number];
 
-export type ThemeId = "coolify" | "midnight" | "nord" | "paper" | "terminal";
+export type ThemeId = "obsidian" | "midnight" | "nord" | "paper" | "terminal";
 
 export type ThemeMode = "dark" | "light";
 
@@ -42,10 +42,10 @@ export interface Theme {
 }
 
 export const DEFAULT_THEME: Theme = {
-  // The id is kept as "coolify" so existing localStorage selections keep working.
-  id: "coolify",
-  name: "Forest",
-  description: "Near-black surfaces with a forest-teal accent.",
+  // An unknown stored id, including the theme's former id, falls back to this one.
+  id: "obsidian",
+  name: "Obsidian",
+  description: "Near-black surfaces with a teal accent.",
   mode: "dark",
   vars: {
     "--bg": "#0a0a0b",

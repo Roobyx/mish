@@ -1,4 +1,4 @@
-/* Base tokens mirror the default "Forest" theme so the first paint is already
+/* Base tokens mirror the default "Obsidian" theme so the first paint is already
    correct; the theme library overrides them on <html> at startup. */
 :root {
   --bg: #0a0a0b;

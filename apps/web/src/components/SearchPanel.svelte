@@ -17,14 +17,18 @@
 
   let ext = $state("");
   let kind = $state<"" | NodeKind>("");
-  let sizeMin = $state("");
-  let sizeMax = $state("");
+  let sizeMin = $state<string | number | undefined>("");
+  let sizeMax = $state<string | number | undefined>("");
   let results = $state<NodeRecord[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
   let searched = $state(false);
 
-  function toNumber(value: string): number | undefined {
+  function toNumber(value: string | number | undefined): number | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value === "number") {
+      return Number.isFinite(value) && value >= 0 ? value : undefined;
+    }
     const trimmed = value.trim();
     if (trimmed.length === 0) return undefined;
     const parsed = Number(trimmed);
@@ -146,8 +150,8 @@
   }
 
   form {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)) auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: end;
     padding: 0.6rem 0.75rem;
@@ -156,6 +160,7 @@
 
   label {
     display: flex;
+    flex: 1 1 7rem;
     flex-direction: column;
     gap: 0.2rem;
     min-width: 0;
@@ -187,6 +192,7 @@
   }
 
   form button {
+    flex: 0 0 auto;
     padding: 0.4rem 0.9rem;
     border: 1px solid var(--accent);
     border-radius: 6px;
@@ -203,7 +209,7 @@
   }
 
   .table-wrap {
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
   }

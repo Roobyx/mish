@@ -2,6 +2,30 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.16.2] - 2026-11-13
+
+### Web
+
+- **Search results are visible again.** The search form stacked its fields into one column inside the
+  capped drawer, so the results table was squeezed to zero height and clicking Search appeared to do
+  nothing. The fields now wrap in a row, and the results area keeps the remaining drawer height.
+- **Byte filters accept typed values.** Number inputs bind numbers, not strings, so entering a
+  minimum or maximum size no longer failed before the request was sent.
+- **Default theme renamed to Obsidian.** Forest is now Obsidian; the palette is unchanged. The theme
+  id follows the name, and an unknown stored id falls back to the default, so existing selections
+  keep the same look.
+
+### Deployment
+
+- **`coolify-compose.yml` no longer embeds one deployment's host and address.** The routing comment
+  and the `MISH_ALLOWED_HOSTS` default were specific to a single instance; the default is now
+  `localhost,127.0.0.1`. Set `MISH_ALLOWED_HOSTS` (the proxy hostname) and `MISH_PUBLISH_ADDR` (the
+  address the proxy reaches) in Coolify's environment.
+
+### Version updates
+
+- Root and `@mish/web` 1.16.1 → 1.16.2. Server, site, api-types and crates are unchanged.
+
 ## [1.16.1] - 2026-11-10
 
 ### Security

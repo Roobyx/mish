@@ -1,9 +1,8 @@
 # Coolify deployment of the mish stack.
 #
 # Coolify's built-in proxy is not used. The app and site publish host ports and
-# an external reverse proxy routes:
-#   mish.cats-on-a.quest     -> 0.0.0.0:3300 (site)
-#   mish.cats-on-a.quest/app -> 100.100.245.252:9543 (app, built with MISH_WEB_BASE=/app/)
+# an external reverse proxy routes the site to MISH_SITE_PORT and the app under
+# a path prefix to MISH_PORT (the image is built with MISH_WEB_BASE).
 #
 # Images are tagged for GHCR so a build can be pushed with `docker compose push`
 # and matches the release workflow.
@@ -31,7 +30,7 @@ services:
       MISH_HOST_ROOT: /host
       MISH_DOCKER: ${MISH_DOCKER:-true}
       MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
-      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-mish.cats-on-a.quest,app.cats-on-a.quest,localhost,127.0.0.1}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
       MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-true}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:

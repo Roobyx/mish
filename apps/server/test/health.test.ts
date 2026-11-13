@@ -125,7 +125,7 @@ describe("server API", () => {
       config: {
         ...config(),
         trustProxy: true,
-        allowedHosts: ["mish.cats-on-a.quest"],
+        allowedHosts: ["app.example.com"],
       },
       core,
     });
@@ -135,7 +135,7 @@ describe("server API", () => {
       headers: {
         "content-type": "application/json",
         "x-forwarded-host": "127.0.0.1:9543",
-        origin: "https://mish.cats-on-a.quest",
+        origin: "https://app.example.com",
       },
       body: JSON.stringify({ keep: 3 }),
     });

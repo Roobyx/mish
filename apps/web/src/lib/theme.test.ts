@@ -55,7 +55,7 @@ describe("theme catalogue", () => {
   });
 
   test("recognises only known theme ids", () => {
-    expect(isThemeId("coolify")).toBe(true);
+    expect(isThemeId("obsidian")).toBe(true);
     expect(isThemeId("paper")).toBe(true);
     expect(isThemeId("solarized")).toBe(false);
     expect(isThemeId(null)).toBe(false);
