@@ -344,6 +344,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "mish-cli"
+version = "1.16.2"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "mish-core",
+ "mish-ipc",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "mish-core"
+version = "1.16.2"
+dependencies = [
+ "blake3",
+ "globset",
+ "libc",
+ "memmap2",
+ "mish-ipc",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tracing",
+ "zstd",
+]
+
+[[package]]
+name = "mish-ipc"
+version = "1.16.2"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -448,47 +489,6 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys",
-]
-
-[[package]]
-name = "mish-cli"
-version = "1.16.1"
-dependencies = [
- "anyhow",
- "clap",
- "clap_complete",
- "mish-core",
- "mish-ipc",
- "serde",
- "serde_json",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "mish-core"
-version = "1.16.1"
-dependencies = [
- "blake3",
- "globset",
- "libc",
- "memmap2",
- "rayon",
- "mish-ipc",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tracing",
- "zstd",
-]
-
-[[package]]
-name = "mish-ipc"
-version = "1.16.1"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]

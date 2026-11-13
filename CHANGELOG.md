@@ -24,7 +24,8 @@ All notable changes to mish are documented here. Newest entries first.
 
 ### Version updates
 
-- Root and `@mish/web` 1.16.1 → 1.16.2. Server, site, api-types and crates are unchanged.
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.16.1 → 1.16.2.
 
 ## [1.16.1] - 2026-11-10
 
