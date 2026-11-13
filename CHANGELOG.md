@@ -2,6 +2,17 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.18.0] - 2026-11-13
+### Web
+- **Floating layout added.** A new shell layout places the navigation rail and workspace on a dotted
+canvas, with rounded floating cards, a translucent topbar and a soft gradient sidebar. The original
+edge-to-edge layout stays the default, and both can be switched from the theme menu or Settings.
+- **Amber theme added.** A warm charcoal palette with a golden accent and matching warm surfaces.
+- **Screenshots refreshed.** The README screenshots now show the floating layout in the default
+Obsidian theme, captured from a synthetic demo dataset.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.17.0 → 1.18.0.
 ## [1.17.0] - 2026-11-13
 ### Web
 - **Reports can be exported from every view.** The topbar Export menu saves the current chart

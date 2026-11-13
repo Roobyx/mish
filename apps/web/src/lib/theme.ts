@@ -29,7 +29,7 @@ export const THEME_VARS = [
 
 export type ThemeVar = (typeof THEME_VARS)[number];
 
-export type ThemeId = "obsidian" | "midnight" | "nord" | "paper" | "terminal";
+export type ThemeId = "obsidian" | "midnight" | "nord" | "amber" | "paper" | "terminal";
 
 export type ThemeMode = "dark" | "light";
 
@@ -139,6 +139,38 @@ export const THEMES: readonly Theme[] = [
       "--shadow-md": "0 8px 24px rgba(0, 0, 0, 0.32)",
       "--shadow-lg": "0 24px 60px rgba(0, 0, 0, 0.45)",
       "--ring": "rgba(136, 192, 208, 0.4)",
+    },
+  },
+  {
+    id: "amber",
+    name: "Amber",
+    description: "Warm charcoal with a golden accent.",
+    mode: "dark",
+    vars: {
+      "--bg": "#0c0a06",
+      "--panel": "#14110a",
+      "--panel-2": "#1b170e",
+      "--panel-3": "#252015",
+      "--border": "#312a1a",
+      "--border-strong": "#4a3f28",
+      "--text": "#fbf4e3",
+      "--muted": "#bfae8b",
+      "--subtle": "#8d7d5f",
+      "--accent": "#f5c542",
+      "--accent-hover": "#ffd76a",
+      "--accent-contrast": "#2a1e00",
+      "--ok": "#8fcf8a",
+      "--warn": "#fb923c",
+      "--err": "#f87171",
+      "--sidebar": "#0f0c07",
+      "--sidebar-2": "#17130b",
+      "--sidebar-active": "#2a2211",
+      "--logo-bg": "#1a150c",
+      "--overlay": "rgba(10, 8, 4, 0.74)",
+      "--shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.4)",
+      "--shadow-md": "0 8px 24px rgba(0, 0, 0, 0.45)",
+      "--shadow-lg": "0 24px 60px rgba(0, 0, 0, 0.6)",
+      "--ring": "rgba(245, 197, 66, 0.35)",
     },
   },
   {

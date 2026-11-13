@@ -11,7 +11,7 @@
     },
     "apps/server": {
       "name": "@mish/server",
-      "version": "1.17.0",
+      "version": "1.18.0",
       "dependencies": {
         "@mish/api-types": "workspace:*",
         "hono": "^4.6.0",
@@ -23,7 +23,7 @@
     },
     "apps/site": {
       "name": "@mish/site",
-      "version": "1.17.0",
+      "version": "1.18.0",
       "dependencies": {
         "@astrojs/sitemap": "^3.6.0",
         "@astrojs/starlight": "^0.34.0",
@@ -40,7 +40,7 @@
     },
     "apps/web": {
       "name": "@mish/web",
-      "version": "1.17.0",
+      "version": "1.18.0",
       "dependencies": {
         "@mish/api-types": "workspace:*",
       },
@@ -55,7 +55,7 @@
     },
     "packages/api-types": {
       "name": "@mish/api-types",
-      "version": "1.17.0",
+      "version": "1.18.0",
       "devDependencies": {
         "typescript": "^5.6.0",
       },

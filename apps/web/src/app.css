@@ -103,3 +103,199 @@ textarea {
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* --------------------------------------------------------- floating layout */
+
+html[data-layout="floating"] body {
+  background-color: var(--bg);
+  background-image: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--text) 11%, transparent) 1px,
+    transparent 1.6px
+  );
+  background-size: 24px 24px;
+  background-attachment: fixed;
+}
+
+html[data-layout="floating"] .shell {
+  gap: 0.85rem;
+  padding: 0.85rem;
+}
+
+/* The rail is the only surface that carries a gradient. */
+html[data-layout="floating"] .sidebar {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      130% 70% at 50% -18%,
+      color-mix(in srgb, var(--accent) 13%, transparent),
+      transparent 62%
+    ),
+    linear-gradient(165deg, var(--sidebar-2), var(--sidebar) 58%, var(--bg));
+  box-shadow:
+    var(--shadow-lg),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+html[data-layout="floating"] .sidebar-brand {
+  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+html[data-layout="floating"] .sidebar-footer {
+  border-top-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+html[data-layout="floating"] .nav-item {
+  border-radius: 11px;
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
+}
+
+html[data-layout="floating"] .nav-item:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  transform: translateY(-1px);
+}
+
+html[data-layout="floating"] .nav-item.active {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow:
+    0 6px 18px color-mix(in srgb, var(--accent) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+html[data-layout="floating"] .workspace {
+  gap: 0.85rem;
+}
+
+html[data-layout="floating"] .topbar {
+  position: relative;
+  /* Above scrolling panels, below the mobile scrim (15) and sidebar (20). */
+  z-index: 10;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+html[data-layout="floating"] .icon-button,
+html[data-layout="floating"] .action {
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
+html[data-layout="floating"] .page {
+  padding: 0.1rem 0 0;
+}
+
+html[data-layout="floating"] .split {
+  gap: 0.85rem;
+  padding: 0;
+}
+
+html[data-layout="floating"] .search-panel {
+  margin: 0;
+}
+
+html[data-layout="floating"] .page > .panel,
+html[data-layout="floating"] .split > .panel,
+html[data-layout="floating"] .settings > .panel,
+html[data-layout="floating"] .search-panel,
+html[data-layout="floating"] .stat,
+html[data-layout="floating"] .empty-card {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+html[data-layout="floating"] .page > .panel > .panel-head,
+html[data-layout="floating"] .split > .panel > .panel-head,
+html[data-layout="floating"] .settings > .panel > .panel-head {
+  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
+}
+
+html[data-layout="floating"] .drive,
+html[data-layout="floating"] .status-card {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 13px;
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+html[data-layout="floating"] .pill,
+html[data-layout="floating"] .kbd,
+html[data-layout="floating"] .segmented,
+html[data-layout="floating"] .metric-toggle,
+html[data-layout="floating"] .tabs {
+  border-radius: 999px;
+}
+
+html[data-layout="floating"] .segmented button,
+html[data-layout="floating"] .metric-toggle button,
+html[data-layout="floating"] .tabs .tab {
+  border-radius: 999px;
+}
+
+html[data-layout="floating"] .statusbar {
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+html[data-layout="floating"] .page-settings {
+  padding: 0;
+}
+
+html[data-layout="floating"] .settings {
+  padding: 0.1rem 0 0;
+}
+
+@media (max-width: 900px) {
+  html[data-layout="floating"] .shell {
+    gap: 0.6rem;
+    padding: 0.6rem;
+  }
+
+  html[data-layout="floating"] .sidebar {
+    inset: 0.6rem auto 0.6rem 0.6rem;
+    width: min(18rem, 86vw);
+    border-radius: 18px;
+  }
+
+  html[data-layout="floating"] .workspace {
+    gap: 0.6rem;
+  }
+
+  html[data-layout="floating"] .page {
+    padding: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  html[data-layout="floating"] .shell {
+    gap: 0.45rem;
+    padding: 0.45rem;
+  }
+
+  html[data-layout="floating"] .sidebar {
+    inset: 0.45rem auto 0.45rem 0.45rem;
+  }
+}

@@ -5,6 +5,7 @@
   import { formatAgo, formatBytes } from "../lib/format.js";
   import { scanRootLabel } from "../lib/mounts.js";
   import { stateMeta } from "../lib/scan-state.js";
+  import { LAYOUTS, type LayoutId } from "../lib/shell-layout.js";
   import type { ThemeId } from "../lib/theme.js";
 
   import Icon from "./Icon.svelte";
@@ -19,6 +20,8 @@
     healthError: string | null;
     theme: ThemeId;
     ontheme: (id: ThemeId) => void;
+    layout: LayoutId;
+    onlayout: (id: LayoutId) => void;
     onopen: (scanId: string) => void | Promise<void>;
     onchanged: () => Promise<void>;
   }
@@ -31,6 +34,8 @@
     healthError,
     theme,
     ontheme,
+    layout,
+    onlayout,
     onopen,
     onchanged,
   }: Props = $props();
@@ -217,6 +222,31 @@
       <span class="muted">stored in this browser</span>
     </div>
     <ThemeGrid {theme} onselect={ontheme} />
+    <div class="layout-picker">
+      <span class="layout-label">Layout</span>
+      <div class="layout-options" role="group" aria-label="Layout">
+        {#each LAYOUTS as entry (entry.id)}
+          <button
+            type="button"
+            class="layout-choice"
+            class:active={entry.id === layout}
+            aria-pressed={entry.id === layout}
+            onclick={() => onlayout(entry.id)}
+          >
+            <span class="layout-icon">
+              <Icon name={entry.id === "floating" ? "layers" : "grid"} size={14} />
+            </span>
+            <span class="layout-choice-main">
+              <span class="layout-choice-name">{entry.name}</span>
+              <span class="layout-choice-desc">{entry.description}</span>
+            </span>
+            {#if entry.id === layout}
+              <span class="layout-tick"><Icon name="check" size={13} /></span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+    </div>
   </section>
 
   <section class="panel">
@@ -796,6 +826,87 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
+  }
+
+  .layout-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0 0.85rem 0.85rem;
+  }
+
+  .layout-label {
+    color: var(--subtle);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .layout-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.5rem;
+  }
+
+  .layout-choice {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--panel-2);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .layout-choice:hover {
+    border-color: var(--border-strong);
+  }
+
+  .layout-choice.active {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--panel-2));
+  }
+
+  .layout-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+  }
+
+  .layout-choice.active .layout-icon {
+    color: var(--accent);
+  }
+
+  .layout-choice-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+  }
+
+  .layout-choice-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .layout-choice-desc {
+    color: var(--muted);
+    font-size: 0.68rem;
+    line-height: 1.35;
+  }
+
+  .layout-tick {
+    display: inline-flex;
+    flex: none;
+    color: var(--accent);
   }
 
   @media (max-width: 760px) {

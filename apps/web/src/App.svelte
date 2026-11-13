@@ -60,6 +60,13 @@
   import type { IconName } from "./lib/icons.js";
   import { type MishReport, reportTypeLabel } from "./lib/report.js";
   import {
+    applyLayout,
+    layoutById,
+    readStoredLayout,
+    storeLayout,
+    type LayoutId,
+  } from "./lib/shell-layout.js";
+  import {
     applyTheme,
     readStoredTheme,
     storeTheme,
@@ -293,6 +300,9 @@
   /** Selected colour theme, persisted in local storage. */
   let theme = $state<ThemeId>(readStoredTheme());
 
+  /** Selected shell layout, persisted in local storage. */
+  let layout = $state<LayoutId>(readStoredLayout());
+
   /** Node id whose overlay tree is shown in the Docker side panel, or null when closed. */
   let sideTreeNodeId = $state<number | null>(null);
 
@@ -341,11 +351,18 @@
         "Overview"),
   );
   const activeTheme = $derived(themeById(theme));
+  const activeLayout = $derived(layoutById(layout));
 
   function chooseTheme(id: ThemeId): void {
     theme = id;
     applyTheme(id);
     storeTheme(id);
+  }
+
+  function chooseLayout(id: LayoutId): void {
+    layout = id;
+    applyLayout(id);
+    storeLayout(id);
   }
 
   function go(next: ViewId): void {
@@ -744,6 +761,7 @@
 
   onMount(() => {
     applyTheme(theme);
+    applyLayout(layout);
 
     function onKeydown(event: KeyboardEvent): void {
       const target = event.target;
@@ -1002,7 +1020,9 @@
           <Icon name="search" size={16} />
           <span class="kbd">/</span>
         </button>
-        <span class="theme-slot"><ThemeSwitcher {theme} onselect={chooseTheme} /></span>
+        <span class="theme-slot">
+          <ThemeSwitcher {theme} onselect={chooseTheme} {layout} onlayout={chooseLayout} />
+        </span>
         <button type="button" class="action primary new-scan" onclick={openLauncher}>
           <Icon name="plus" size={15} />
           <span class="btn-label">New scan</span>
@@ -1111,6 +1131,8 @@
             {healthError}
             {theme}
             ontheme={chooseTheme}
+            {layout}
+            onlayout={chooseLayout}
             onopen={openManagedScan}
             onchanged={handleScansChanged}
           />
@@ -1414,7 +1436,7 @@
       <div class="statusbar-right">
         <span>read-only · no telemetry</span>
         <span class="dot-sep">·</span>
-        <span>{activeTheme.name}</span>
+        <span>{activeTheme.name} · {activeLayout.name}</span>
       </div>
     </footer>
   </div>

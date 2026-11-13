@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  import { LAYOUTS, type LayoutId } from "../lib/shell-layout.js";
   import { THEMES, themeById, type ThemeId } from "../lib/theme.js";
 
   import Icon from "./Icon.svelte";
@@ -8,18 +9,25 @@
   interface Props {
     theme: ThemeId;
     onselect: (id: ThemeId) => void;
+    layout: LayoutId;
+    onlayout: (id: LayoutId) => void;
   }
 
-  let { theme, onselect }: Props = $props();
+  let { theme, onselect, layout, onlayout }: Props = $props();
 
   let open = $state(false);
   let host = $state<HTMLDivElement | null>(null);
 
   const current = $derived(themeById(theme));
 
-  function choose(id: ThemeId): void {
+  function chooseTheme(id: ThemeId): void {
     open = false;
     onselect(id);
+  }
+
+  function chooseLayout(id: LayoutId): void {
+    open = false;
+    onlayout(id);
   }
 
   onMount(() => {
@@ -44,9 +52,9 @@
     type="button"
     class="trigger"
     class:open
-    aria-haspopup="listbox"
+    aria-haspopup="dialog"
     aria-expanded={open}
-    title="Colour theme"
+    title="Theme and layout"
     onclick={() => (open = !open)}
   >
     <Icon name="palette" size={15} />
@@ -55,34 +63,65 @@
   </button>
 
   {#if open}
-    <ul class="menu" role="listbox" aria-label="Colour theme">
-      {#each THEMES as entry (entry.id)}
-        <li role="presentation">
-          <button
-            type="button"
-            class="option"
-            class:selected={entry.id === theme}
-            role="option"
-            aria-selected={entry.id === theme}
-            onclick={() => choose(entry.id)}
-          >
-            <span class="swatches" aria-hidden="true">
-              <span style="background: {entry.vars['--bg']}"></span>
-              <span style="background: {entry.vars['--panel-2']}"></span>
-              <span style="background: {entry.vars['--accent']}"></span>
-              <span style="background: {entry.vars['--text']}"></span>
-            </span>
-            <span class="option-main">
-              <span class="option-title">{entry.name}</span>
-              <span class="option-meta">{entry.description}</span>
-            </span>
-            {#if entry.id === theme}
-              <span class="tick"><Icon name="check" size={14} /></span>
-            {/if}
-          </button>
-        </li>
-      {/each}
-    </ul>
+    <div class="menu" role="dialog" aria-label="Theme and layout">
+      <div class="section">
+        <span class="section-label">Theme</span>
+        <ul class="options" role="listbox" aria-label="Colour theme">
+          {#each THEMES as entry (entry.id)}
+            <li role="presentation">
+              <button
+                type="button"
+                class="option"
+                class:selected={entry.id === theme}
+                role="option"
+                aria-selected={entry.id === theme}
+                onclick={() => chooseTheme(entry.id)}
+              >
+                <span class="swatches" aria-hidden="true">
+                  <span style="background: {entry.vars['--bg']}"></span>
+                  <span style="background: {entry.vars['--panel-2']}"></span>
+                  <span style="background: {entry.vars['--accent']}"></span>
+                  <span style="background: {entry.vars['--text']}"></span>
+                </span>
+                <span class="option-main">
+                  <span class="option-title">{entry.name}</span>
+                  <span class="option-meta">{entry.description}</span>
+                </span>
+                {#if entry.id === theme}
+                  <span class="tick"><Icon name="check" size={14} /></span>
+                {/if}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+
+      <div class="section">
+        <span class="section-label">Layout</span>
+        <div class="options" role="group" aria-label="Layout">
+          {#each LAYOUTS as entry (entry.id)}
+            <button
+              type="button"
+              class="option layout-option"
+              class:selected={entry.id === layout}
+              aria-pressed={entry.id === layout}
+              onclick={() => chooseLayout(entry.id)}
+            >
+              <span class="layout-icon" aria-hidden="true">
+                <Icon name={entry.id === "floating" ? "layers" : "grid"} size={14} />
+              </span>
+              <span class="option-main">
+                <span class="option-title">{entry.name}</span>
+                <span class="option-meta">{entry.description}</span>
+              </span>
+              {#if entry.id === layout}
+                <span class="tick"><Icon name="check" size={14} /></span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -138,14 +177,44 @@
     z-index: 60;
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
-    width: min(19rem, calc(100vw - 2rem));
+    gap: 0.45rem;
+    width: min(19.5rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 5rem);
     margin: 0;
-    padding: 0.35rem;
+    padding: 0.45rem;
+    overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--panel);
     box-shadow: var(--shadow-lg);
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .section + .section {
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .section-label {
+    padding: 0.1rem 0.55rem 0.2rem;
+    color: var(--subtle);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin: 0;
+    padding: 0;
     list-style: none;
   }
 
@@ -154,7 +223,7 @@
     align-items: center;
     gap: 0.6rem;
     width: 100%;
-    padding: 0.5rem 0.55rem;
+    padding: 0.45rem 0.55rem;
     border: 1px solid transparent;
     border-radius: 8px;
     background: none;
@@ -187,6 +256,24 @@
 
   .swatches span {
     border-radius: 2px;
+  }
+
+  .layout-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel-2);
+    color: var(--muted);
+  }
+
+  .option.selected .layout-icon {
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--accent);
   }
 
   .option-main {

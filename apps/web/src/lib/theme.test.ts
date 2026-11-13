@@ -56,10 +56,18 @@ describe("theme catalogue", () => {
 
   test("recognises only known theme ids", () => {
     expect(isThemeId("obsidian")).toBe(true);
+    expect(isThemeId("amber")).toBe(true);
     expect(isThemeId("paper")).toBe(true);
     expect(isThemeId("solarized")).toBe(false);
     expect(isThemeId(null)).toBe(false);
     expect(isThemeId(42)).toBe(false);
+  });
+
+  test("ships a warm amber theme with a golden accent", () => {
+    const amber = themeById("amber");
+    expect(amber.mode).toBe("dark");
+    expect(amber.vars["--accent"]).toBe("#f5c542");
+    expect(amber.vars["--accent-contrast"]).toBe("#2a1e00");
   });
 
   test("themeById falls back to the default", () => {
