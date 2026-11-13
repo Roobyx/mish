@@ -10,7 +10,7 @@ Scan a filesystem once, then explore it as an interactive treemap in your browse
 Read-only, Docker-aware, JSON-first, and built for servers.
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.16.2-informational?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.17.0-informational?style=flat-square)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)](#requirements)
 [![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](#quick-start)
 [![No telemetry](https://img.shields.io/badge/telemetry-none-success?style=flat-square)](#security-model)
@@ -43,6 +43,8 @@ Diskover's Elasticsearch-shaped RAM bill.
 - [Security model](#security-model)
 - [Development](#development)
 - [Documentation](#documentation)
+- [Project status](#project-status)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## Why mish
@@ -349,15 +351,37 @@ does not produce a runtime image.
   CLI, API, configuration, Docker, web UI, security and troubleshooting.
 - Agent skill: [`skills/mish/SKILL.md`](skills/mish/SKILL.md).
 - Security policy: [`SECURITY.md`](SECURITY.md).
+- Contribution guidelines: [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md).
 
 The docs site is built and served by the compose stack at <http://localhost:3300>.
 
+## Project status
+
+mish was built out of personal necessity: I needed to answer "where did the disk space go?" on headless 
+machines I could not sit in front of, and nothing existing fit the constraints. It will be
+maintained to the best of my abilities and available time.
+
+- **Free to use.** Anyone is free to run, modify and redistribute it under the license terms.
+- **No warranty and no responsibility.** The software is provided as-is. I take no responsibility
+  for how the project is used by other people, or for any consequences of that use, including data
+  loss, downtime or decisions made from its output. Test it before pointing it at anything you care
+  about.
+- **Roadmap.** A roadmap will be published in the future.
+- **Feature suggestions are welcome.** Open an issue with the problem and the use case; see
+  [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Contributing
 
-Issues and pull requests are welcome. For anything larger than a bug fix, open an issue first so the
-design can be agreed on before code is written. Please keep changes read-only toward scanned files,
-keep the scanner streaming, and add tests for changed behavior.
+The project is open to community contributions. **Bugs are prioritized before features**: a
+correctness bug gets triaged and fixed before new feature work, and feature requests are read and
+kept but are not commitments.
+
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the bug report checklist, the development setup, the
+checks to run before opening a pull request, and the coding standards. For anything larger than a
+bug fix, open an issue first so the design can be agreed on before code is written. Please keep
+changes read-only toward scanned files, keep the scanner streaming, and add tests for changed
+behavior.
 
 ## License
 

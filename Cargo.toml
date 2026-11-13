@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/mish-core", "crates/mish-cli", "crates/mish-ipc"]
 
 [workspace.package]
-version = "1.16.2"
+version = "1.17.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/Roobyx/mish"

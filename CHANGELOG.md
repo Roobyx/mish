@@ -2,6 +2,23 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.17.0] - 2026-11-13
+### Web
+- **Reports can be exported from every view.** The topbar Export menu saves the current chart
+as a `.mish` SVG image report, the current scope tree as a `.mish` log report, or both in a
+mixed `.mish` report; file names follow `mish-report-{image|tree|mixed}-{date_time}.mish`.
+- **Reports can be imported.** The same menu opens a `.mish` file in a read-only viewer that
+renders SVG images, a tree plus its raw log, or both.
+### Documentation
+- **Contributions policy added.** `CONTRIBUTING.md` states that the project is open to community
+contributions, that bugs are prioritized before features, and sets out the bug report, pull request,
+testing and coding guidelines.
+- **Project status documented.** The README now says mish was built out of personal necessity, is
+maintained to the best of the maintainer's ability and time, carries no responsibility for others'
+use, and will publish a roadmap while welcoming feature suggestions.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.16.2 → 1.17.0.
 ## [1.16.2] - 2026-11-13
 
 ### Web

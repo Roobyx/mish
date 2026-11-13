@@ -1,6 +1,6 @@
 export const site = {
   name: "mish",
-  version: "1.16.2",
+  version: "1.17.0",
   tagline: "Where did the disk space go?",
   description:
     "Scan a filesystem once, then explore it as an interactive treemap in your browser. Read-only, Docker-aware, JSON-first, and built for servers.",

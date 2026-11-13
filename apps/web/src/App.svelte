@@ -28,6 +28,8 @@
   import Logo from "./components/Logo.svelte";
   import Modal from "./components/Modal.svelte";
   import RankedTable from "./components/RankedTable.svelte";
+  import ReportMenu from "./components/ReportMenu.svelte";
+  import ReportViewer from "./components/ReportViewer.svelte";
   import ScanLauncher from "./components/ScanLauncher.svelte";
   import ScanProgressPanel from "./components/ScanProgressPanel.svelte";
   import ScanSwitcher from "./components/ScanSwitcher.svelte";
@@ -56,6 +58,7 @@
   import { fileTypeLabel, groupOfExtension } from "./lib/file-types.js";
   import { formatAgo, formatBytes } from "./lib/format.js";
   import type { IconName } from "./lib/icons.js";
+  import { type MishReport, reportTypeLabel } from "./lib/report.js";
   import {
     applyTheme,
     readStoredTheme,
@@ -282,6 +285,11 @@
   let launcherOpen = $state(false);
   let sidebarOpen = $state(false);
 
+  /** Report opened from a `.mish` file, shown in a read-only viewer. */
+  let reportView = $state<MishReport | null>(null);
+  let toast = $state<string | null>(null);
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
   /** Selected colour theme, persisted in local storage. */
   let theme = $state<ThemeId>(readStoredTheme());
 
@@ -297,7 +305,10 @@
   let scanSeq = 0;
   let switchTimer: ReturnType<typeof setTimeout> | undefined;
 
-  onDestroy(() => clearTimeout(switchTimer));
+  onDestroy(() => {
+    clearTimeout(switchTimer);
+    clearTimeout(toastTimer);
+  });
 
   function timestampOf(scan: ScanSummary): number {
     return scan.finishedAtMs ?? scan.startedAtMs;
@@ -348,6 +359,16 @@
     searchOpen = !searchOpen;
   }
 
+  function showToast(message: string): void {
+    toast = message;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (toast = null), 4_000);
+  }
+
+  function handleReportImport(report: MishReport): void {
+    reportView = report;
+  }
+
   /** Veil the shell while another snapshot is selected and its data arrives. */
   function beginSwitch(): void {
     swhitching = true;
@@ -370,6 +391,31 @@
   const scopeLabel = $derived(scopePath[scopePath.length - 1]?.name ?? "/");
   const totalBytes = $derived(tiles.reduce((sum, tile) => sum + tile.size, 0));
   const isHierarchyView = $derived(view === "sunburst" || view === "icicle" || view === "bubble");
+
+  const snapshotRoot = $derived.by(() => {
+    const scan = scans.find((entry) => entry.id === selectedId);
+    return scan?.roots[0] ?? null;
+  });
+
+  /** The current chart is rendered and safe to rasterize. */
+  const canExportImage = $derived.by(() => {
+    if (!selectedId || !treemapHost) return false;
+    if (view === "treemap") return !loading && !error && tiles.length > 0;
+    if (isHierarchyView) {
+      return !viewLoading && !viewError && (tree?.children?.length ?? 0) > 0;
+    }
+    if (view === "bars") return !viewLoading && !viewError && topNodes.length > 0;
+    if (view === "heatmap") return !viewLoading && !viewError && heatmapData !== null;
+    if (
+      view === "histogram" ||
+      view === "extensions" ||
+      view === "age" ||
+      view === "owners"
+    ) {
+      return !viewLoading && !viewError && histogram.length > 0;
+    }
+    return false;
+  });
 
   const completedScans = $derived(scans.filter((scan) => scan.state === "completed"));
   const newestCompleted = $derived.by(() => {
@@ -930,6 +976,19 @@
           disabled={swhitching}
           onselect={(id) => void selectScan(id)}
         />
+        <ReportMenu
+          view={view}
+          snapshotId={selectedId}
+          snapshotRoot={snapshotRoot}
+          scopeId={scopeId}
+          scopePath={scopePath}
+          chartHost={treemapHost}
+          canExportImage={canExportImage}
+          tiles={tiles}
+          colorMode={colorMode}
+          onimport={handleReportImport}
+          onnotice={showToast}
+        />
         <button
           type="button"
           class="icon-button search-button"
@@ -1377,6 +1436,21 @@
     >
       <ScanLauncher oncreated={handleLauncherCreated} />
     </Modal>
+  {/if}
+
+  {#if reportView}
+    <Modal
+      title="Imported report"
+      subtitle={`${reportTypeLabel(reportView.type)} · ${reportView.view}`}
+      onclose={() => (reportView = null)}
+      wide
+    >
+      <ReportViewer report={reportView} />
+    </Modal>
+  {/if}
+
+  {#if toast}
+    <div class="toast" role="status">{toast}</div>
   {/if}
 
   <ScanProgressPanel onfinished={handleScanFinished} />
@@ -2090,6 +2164,21 @@
     background: var(--panel);
     color: var(--text);
     font-size: 0.85rem;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 2.6rem;
+    z-index: 90;
+    max-width: min(28rem, calc(100vw - 2rem));
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 0.78rem;
     box-shadow: var(--shadow-lg);
   }
 

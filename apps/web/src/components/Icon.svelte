@@ -68,6 +68,9 @@
   {:else if name === "download"}
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <path d="m7 10 5 5 5-5M12 15V3" />
+  {:else if name === "upload"}
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="m7 8 5-5 5 5M12 3v12" />
   {:else if name === "refresh"}
     <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
     <path d="M21 3v5h-5" />

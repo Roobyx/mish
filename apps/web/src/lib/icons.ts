@@ -19,6 +19,7 @@ export type IconName =
   | "box"
   | "trash"
   | "download"
+  | "upload"
   | "refresh"
   | "folder"
   | "copy"
