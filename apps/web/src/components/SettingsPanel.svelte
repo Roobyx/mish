@@ -144,9 +144,9 @@
     <div class="panel-head">
       <div class="title">
         <Icon name="plug" size={15} />
-        <h2>Connection</h2>
+        <h2>Runtime</h2>
       </div>
-      <span class="muted">runtime status</span>
+      <span class="muted">status</span>
     </div>
     <div class="connection-grid">
       <article
@@ -209,6 +209,15 @@
             No health information yet.
           {/if}
         </p>
+      </article>
+
+      <article class="status-card">
+        <div class="status-head">
+          <Icon name="shield" size={16} />
+          <span>Access</span>
+          <span class="badge muted">read-only</span>
+        </div>
+        <p class="status-detail">No telemetry · snapshots stay on this host.</p>
       </article>
     </div>
   </section>

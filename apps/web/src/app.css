@@ -198,7 +198,8 @@ html[data-layout="floating"] .page {
 }
 
 html[data-layout="floating"] .split {
-  gap: 0.85rem;
+  column-gap: 0;
+  row-gap: 0.85rem;
   padding: 0;
 }
 

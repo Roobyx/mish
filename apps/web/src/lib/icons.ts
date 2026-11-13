@@ -3,6 +3,7 @@ export type IconName =
   | "settings"
   | "search"
   | "chevron-down"
+  | "chevron-up"
   | "chevron-left"
   | "chevron-right"
   | "check"

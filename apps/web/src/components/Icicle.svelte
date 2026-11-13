@@ -4,6 +4,9 @@
   import { colorForKey } from "../lib/color.js";
   import { formatBytes } from "../lib/format.js";
   import { icicleRects, type IcicleRect } from "../lib/layout.js";
+  import { kindLabel } from "../lib/node-glyph.js";
+
+  import NodeIcon from "./NodeIcon.svelte";
 
   interface Props {
     root: HierarchyNode;
@@ -32,10 +35,20 @@
           type="button"
           class="cell"
           style="left: {rect.x * 100}%; width: {rect.w * 100}%; background: {colorForKey(rect.node.name)}"
-          title={`${rect.node.name} · ${formatBytes(rect.node.size)}`}
+          title={`${rect.node.name} · ${kindLabel(rect.node.kind)} · ${formatBytes(rect.node.size)}`}
           onclick={() => onselect(rect.node)}
         >
-          {#if rect.w > 0.05}<span>{rect.node.name}</span>{/if}
+          {#if rect.w > 0.05}
+            <span class="cell-label">
+              <NodeIcon
+                kind={rect.node.kind}
+                color="rgba(11, 14, 20, 0.72)"
+                size={11}
+                decorative
+              />
+              <span class="cell-name">{rect.node.name}</span>
+            </span>
+          {/if}
         </button>
       {/each}
     </div>
@@ -80,6 +93,17 @@
   .cell span {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .cell-label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .cell-name {
+    min-width: 0;
   }
 
   .cell:hover {

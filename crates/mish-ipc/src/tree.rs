@@ -55,6 +55,7 @@ pub struct NodeChildren {
 pub struct Tile {
     pub node: u32,
     pub name: String,
+    pub kind: NodeKind,
     pub size: u64,
     /// Normalized [0,1] rectangle within the tile canvas.
     pub x: f32,

@@ -1,8 +1,11 @@
 <script lang="ts">
   import type { NodeRecord } from "@mish/api-types";
 
-  import { colorForKey } from "../lib/color.js";
+  import { colorForExtension, colorForKey, extensionOf } from "../lib/color.js";
   import { formatBytes } from "../lib/format.js";
+  import { kindLabel } from "../lib/node-glyph.js";
+
+  import NodeIcon from "./NodeIcon.svelte";
 
   interface Props {
     items: NodeRecord[];
@@ -15,6 +18,11 @@
 
   function metricValue(node: NodeRecord): number {
     return metric === "alloc" ? node.sizeAlloc : node.sizeApparent;
+  }
+
+  function tintOf(node: NodeRecord): string {
+    if (node.kind !== "file") return "var(--muted)";
+    return colorForExtension(extensionOf(node.name));
   }
 
   const rows = $derived.by(() => {
@@ -46,10 +54,13 @@
         <button
           type="button"
           class="row"
-          title={`${row.node.name} · ${formatBytes(row.value)}`}
+          title={`${row.node.name} · ${kindLabel(row.node.kind)} · ${formatBytes(row.value)}`}
           onclick={() => onselect(row.node)}
         >
-          <span class="name">{row.node.name}</span>
+          <span class="name">
+            <NodeIcon kind={row.node.kind} color={tintOf(row.node)} size={12} decorative />
+            <span class="name-text">{row.node.name}</span>
+          </span>
           <span class="track">
             <span
               class="fill"
@@ -133,6 +144,14 @@
   }
 
   .name {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .name-text {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

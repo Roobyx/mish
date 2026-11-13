@@ -9,17 +9,17 @@ export interface Layout {
 }
 
 export const DEFAULT_LAYOUT: Layout = {
-  id: "classic",
-  name: "Classic",
-  description: "Edge-to-edge workspace with flat panels.",
+  id: "floating",
+  name: "Floating",
+  description: "Dotted canvas, rounded cards and a gradient rail.",
 };
 
 export const LAYOUTS: readonly Layout[] = [
   DEFAULT_LAYOUT,
   {
-    id: "floating",
-    name: "Floating",
-    description: "Dotted canvas, rounded cards and a gradient rail.",
+    id: "classic",
+    name: "Classic",
+    description: "Edge-to-edge workspace with flat panels.",
   },
 ];
 

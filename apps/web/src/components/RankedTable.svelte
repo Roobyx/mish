@@ -5,6 +5,7 @@
   import { colorForExtension, extensionOf } from "../lib/color.js";
   import { formatBytes } from "../lib/format.js";
 
+  import Icon from "./Icon.svelte";
   import NodeIcon from "./NodeIcon.svelte";
   import Spinner from "./Spinner.svelte";
 
@@ -150,9 +151,9 @@
     sortDir = key === "name" ? "asc" : "desc";
   }
 
-  function arrow(key: SortKey): string {
-    if (sortKey !== key) return "";
-    return sortDir === "asc" ? " ▲" : " ▼";
+  function ariaSort(key: SortKey): "ascending" | "descending" | undefined {
+    if (sortKey !== key) return undefined;
+    return sortDir === "asc" ? "ascending" : "descending";
   }
 
   function toggles(node: NodeRecord): void {
@@ -235,22 +236,44 @@
       <tr>
         <th class="chev"></th>
         <th class="icon"></th>
-        <th class="name">
-          <button type="button" onclick={() => toggleSort("name")}>Name{arrow("name")}</button>
+        <th class="name" aria-sort={ariaSort("name")}>
+          <button type="button" onclick={() => toggleSort("name")}>
+            <span>Name</span>
+            {#if sortKey === "name"}
+              <span class="sort-icon">
+                <Icon name={sortDir === "asc" ? "chevron-up" : "chevron-down"} size={12} />
+              </span>
+            {/if}
+          </button>
         </th>
-        <th class="num">
+        <th class="num alloc" aria-sort={ariaSort("sizeAlloc")}>
           <button type="button" onclick={() => toggleSort("sizeAlloc")}>
-            Allocated{arrow("sizeAlloc")}
+            <span>Allocated</span>
+            {#if sortKey === "sizeAlloc"}
+              <span class="sort-icon">
+                <Icon name={sortDir === "asc" ? "chevron-up" : "chevron-down"} size={12} />
+              </span>
+            {/if}
           </button>
         </th>
-        <th class="num">
+        <th class="num apparent" aria-sort={ariaSort("sizeApparent")}>
           <button type="button" onclick={() => toggleSort("sizeApparent")}>
-            Apparent{arrow("sizeApparent")}
+            <span>Apparent</span>
+            {#if sortKey === "sizeApparent"}
+              <span class="sort-icon">
+                <Icon name={sortDir === "asc" ? "chevron-up" : "chevron-down"} size={12} />
+              </span>
+            {/if}
           </button>
         </th>
-        <th class="num">
+        <th class="num items" aria-sort={ariaSort("children")}>
           <button type="button" onclick={() => toggleSort("children")}>
-            Items{arrow("children")}
+            <span>Items</span>
+            {#if sortKey === "children"}
+              <span class="sort-icon">
+                <Icon name={sortDir === "asc" ? "chevron-up" : "chevron-down"} size={12} />
+              </span>
+            {/if}
           </button>
         </th>
       </tr>
@@ -276,9 +299,10 @@
                 type="button"
                 class="chev-button"
                 aria-label={isExpanded(row.node.id) ? "Collapse" : "Expand"}
+                aria-expanded={isExpanded(row.node.id)}
                 onclick={() => toggles(row.node)}
               >
-                {isExpanded(row.node.id) ? "▼" : "▶"}
+                <span class="chev-icon"><Icon name="chevron-right" size={12} /></span>
               </button>
             {/if}
           </td>
@@ -296,9 +320,9 @@
               {row.node.name}
             </button>
           </td>
-          <td class="num">{formatBytes(row.node.sizeAlloc)}</td>
-          <td class="num">{formatBytes(row.node.sizeApparent)}</td>
-          <td class="num">
+          <td class="num alloc">{formatBytes(row.node.sizeAlloc)}</td>
+          <td class="num apparent">{formatBytes(row.node.sizeApparent)}</td>
+          <td class="num items">
             {row.node.kind === "directory" ? row.node.children.toLocaleString() : "—"}
           </td>
         </tr>
@@ -330,6 +354,7 @@
 
   table {
     width: 100%;
+    min-width: 340px;
     table-layout: fixed;
     border-collapse: collapse;
     font-size: 0.8rem;
@@ -346,27 +371,43 @@
   }
 
   thead th.chev {
-    width: 22px;
+    width: 24px;
   }
 
   thead th.icon {
-    width: 22px;
+    width: 24px;
   }
 
   thead th.name {
-    width: 46%;
+    width: auto;
+  }
+
+  thead th.alloc {
+    width: 84px;
+  }
+
+  thead th.apparent {
+    width: 78px;
+  }
+
+  thead th.items {
+    width: 60px;
   }
 
   thead button {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
     width: 100%;
     padding: 0.5rem 0.6rem;
     border: none;
     background: none;
     color: var(--muted);
     font: inherit;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
+    white-space: nowrap;
     text-align: inherit;
     cursor: pointer;
   }
@@ -375,10 +416,20 @@
     color: var(--text);
   }
 
+  .sort-icon {
+    display: inline-flex;
+    flex: none;
+    color: var(--accent);
+  }
+
   th.num button,
   td.num {
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+
+  th.num button {
+    justify-content: flex-end;
   }
 
   tbody tr.row:hover {
@@ -423,16 +474,26 @@
   }
 
   .chev-button {
-    width: 18px;
-    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
     padding: 0;
     border: none;
     border-radius: 4px;
     background: none;
     color: var(--muted);
-    font: inherit;
-    font-size: 0.6rem;
     cursor: pointer;
+  }
+
+  .chev-icon {
+    display: inline-flex;
+    transition: transform 120ms ease;
+  }
+
+  .chev-button[aria-expanded="true"] .chev-icon {
+    transform: rotate(90deg);
   }
 
   .chev-button:hover {

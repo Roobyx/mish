@@ -1,6 +1,6 @@
 {
   "name": "@mish/server",
-  "version": "1.18.0",
+  "version": "1.18.5",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

@@ -4,7 +4,10 @@
   import { colorForKey } from "../lib/color.js";
   import { formatBytes } from "../lib/format.js";
   import { sunburstArcs } from "../lib/layout.js";
+  import { kindLabel, nodeGlyph } from "../lib/node-glyph.js";
   import { tooltipStyle } from "../lib/tooltip.js";
+
+  import NodeIcon from "./NodeIcon.svelte";
 
   interface Props {
     root: HierarchyNode;
@@ -58,7 +61,7 @@
         stroke-width="1.5"
         role="button"
         tabindex="0"
-        aria-label={`${arc.node.name}, ${formatBytes(arc.node.size)}`}
+        aria-label={`${arc.node.name}, ${kindLabel(arc.node.kind)}, ${formatBytes(arc.node.size)}`}
         onclick={() => onselect(arc.node)}
         onkeydown={(event) => handleKeydown(event, arc.node)}
         onmousemove={(event) => handleMove(event, arc.node)}
@@ -67,6 +70,24 @@
     {/each}
     {#each arcs as arc (arc.node.id)}
       {#if arc.depth === 1 && arc.angle > 0.2}
+        {@const glyph = nodeGlyph(arc.node.kind)}
+        <g
+          class="kind"
+          transform={`translate(${arc.labelX - 5}, ${arc.labelY - 18}) scale(0.625)`}
+          aria-hidden="true"
+        >
+          <path d={glyph.body} fill="rgba(11, 14, 20, 0.82)" />
+          {#if glyph.detail}
+            <path
+              d={glyph.detail}
+              fill="none"
+              stroke={glyph.detailStroke === "cut"
+                ? colorForKey(arc.node.name)
+                : "rgba(11, 14, 20, 0.82)"}
+              stroke-width="1.2"
+            />
+          {/if}
+        </g>
         <text
           class="label"
           x={arc.labelX}
@@ -84,8 +105,11 @@
       class="tooltip"
       style={tooltipStyle({ x: hovered.x, y: hovered.y, width, height })}
     >
-      <strong>{hovered.node.name}</strong>
-      <span>{formatBytes(hovered.node.size)}</span>
+      <strong>
+        <NodeIcon kind={hovered.node.kind} size={12} decorative />
+        <span class="tooltip-name">{hovered.node.name}</span>
+      </strong>
+      <span>{kindLabel(hovered.node.kind)} · {formatBytes(hovered.node.size)}</span>
     </div>
   {/if}
 </div>
@@ -124,6 +148,10 @@
     pointer-events: none;
   }
 
+  .kind {
+    pointer-events: none;
+  }
+
   .tooltip {
     position: absolute;
     z-index: 5;
@@ -141,12 +169,19 @@
   }
 
   .tooltip strong {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .tooltip-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .tooltip span {
+  .tooltip > span {
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }

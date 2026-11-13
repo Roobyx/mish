@@ -5,9 +5,7 @@
 
 #[cfg(unix)]
 use libc::{getgrgid_r, getpwuid_r, group, passwd};
-use mish_ipc::{
-    ContainerOverlayContents, MountInfo, NodeKind, NodeRecord, Tile, TilesResponse,
-};
+use mish_ipc::{ContainerOverlayContents, MountInfo, NodeKind, NodeRecord, Tile, TilesResponse};
 use serde::Serialize;
 
 use crate::index::{flags, IndexReader, Kind};
@@ -365,6 +363,11 @@ impl<'a> QueryEngine<'a> {
         let mut tiles: Vec<Tile> = Vec::with_capacity(buckets.len());
         for ((id, size), rect) in buckets.iter().zip(rects.iter()) {
             let name = self.reader.name(*id).to_string();
+            let kind = self
+                .reader
+                .record(*id)
+                .map(|rec| kind_to_ipc(rec.kind))
+                .unwrap_or(NodeKind::File);
             let color_key = match color {
                 "ext" => self.reader.ext(*id).to_string(),
                 _ => String::new(),
@@ -373,6 +376,7 @@ impl<'a> QueryEngine<'a> {
             tiles.push(Tile {
                 node: *id,
                 name,
+                kind,
                 size: *size,
                 x: rect[0] as f32,
                 y: rect[1] as f32,
@@ -1409,12 +1413,14 @@ mod tests {
             .find(|t| t.name == "big")
             .expect("big tile");
         assert_eq!(big.size, 3_000_000);
+        assert_eq!(big.kind, NodeKind::Directory);
         let small = response
             .tiles
             .iter()
             .find(|t| t.name == "small.txt")
             .expect("small tile");
         assert_eq!(small.size, 1_000);
+        assert_eq!(small.kind, NodeKind::File);
     }
 
     #[test]

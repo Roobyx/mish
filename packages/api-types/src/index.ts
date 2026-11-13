@@ -92,6 +92,7 @@ export interface NodeRecord {
 export interface Tile {
   node: number;
   name: string;
+  kind: NodeKind;
   size: number;
   x: number;
   y: number;

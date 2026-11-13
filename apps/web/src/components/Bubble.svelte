@@ -4,7 +4,10 @@
   import { colorForKey } from "../lib/color.js";
   import { formatBytes } from "../lib/format.js";
   import { bubblePacking } from "../lib/layout.js";
+  import { kindLabel, nodeGlyph } from "../lib/node-glyph.js";
   import { tooltipStyle } from "../lib/tooltip.js";
+
+  import NodeIcon from "./NodeIcon.svelte";
 
   interface Props {
     root: HierarchyNode;
@@ -53,7 +56,7 @@
       <g
         role="button"
         tabindex="0"
-        aria-label={`${circle.node.name}, ${formatBytes(circle.node.size)}`}
+        aria-label={`${circle.node.name}, ${kindLabel(circle.node.kind)}, ${formatBytes(circle.node.size)}`}
         onclick={() => onselect(circle.node)}
         onkeydown={(event) => handleKeydown(event, circle.node)}
         onmousemove={(event) => handleMove(event, circle.node)}
@@ -68,6 +71,26 @@
           stroke="var(--bg)"
           stroke-width="1.5"
         />
+        {#if circle.r * VIEW > 36}
+          {@const glyph = nodeGlyph(circle.node.kind)}
+          <g
+            class="kind"
+            transform={`translate(${circle.x * VIEW - 8}, ${circle.y * VIEW - 32})`}
+            aria-hidden="true"
+          >
+            <path d={glyph.body} fill="rgba(11, 14, 20, 0.82)" />
+            {#if glyph.detail}
+              <path
+                d={glyph.detail}
+                fill="none"
+                stroke={glyph.detailStroke === "cut"
+                  ? colorForKey(circle.node.name)
+                  : "rgba(11, 14, 20, 0.82)"}
+                stroke-width="1.2"
+              />
+            {/if}
+          </g>
+        {/if}
         {#if circle.r * VIEW > 26}
           <text
             class="label"
@@ -87,8 +110,11 @@
       class="tooltip"
       style={tooltipStyle({ x: hovered.x, y: hovered.y, width, height })}
     >
-      <strong>{hovered.node.name}</strong>
-      <span>{formatBytes(hovered.node.size)}</span>
+      <strong>
+        <NodeIcon kind={hovered.node.kind} size={12} decorative />
+        <span class="tooltip-name">{hovered.node.name}</span>
+      </strong>
+      <span>{kindLabel(hovered.node.kind)} · {formatBytes(hovered.node.size)}</span>
     </div>
   {/if}
 </div>
@@ -127,6 +153,10 @@
     pointer-events: none;
   }
 
+  .kind {
+    pointer-events: none;
+  }
+
   .tooltip {
     position: absolute;
     z-index: 5;
@@ -144,12 +174,19 @@
   }
 
   .tooltip strong {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .tooltip-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .tooltip span {
+  .tooltip > span {
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }

@@ -2,6 +2,7 @@ import type { Tile } from "@mish/api-types";
 
 import { type ColorMode, colorForExtension, colorForKey, extensionOf } from "./color.js";
 import { formatBytes } from "./format.js";
+import { nodeGlyph } from "./node-glyph.js";
 import type { ImagePayload } from "./report.js";
 
 const MIN_CHART_AREA = 2_500;
@@ -238,25 +239,41 @@ function treemapSvg(
         `stroke-width="1"/>`,
     );
     if (w >= 48 && h >= 20) {
-      const name = truncate(tile.name, w - 8, "600 12px ui-sans-serif, system-ui, sans-serif");
+      const withIcon = w >= 64;
+      const textX = withIcon ? x + 20 : x + 4;
+      const textWidth = Math.max(0, w - (textX - x) - 4);
+      if (withIcon) {
+        const glyph = nodeGlyph(tile.kind);
+        const ink = "rgba(11, 14, 20, 0.82)";
+        const detail = glyph.detail
+          ? `<path d="${glyph.detail}" fill="none" stroke="${escapeXml(
+              glyph.detailStroke === "cut" ? treemapFill(tile, capture.colorMode) : ink,
+            )}" stroke-width="1.2"/>`
+          : "";
+        parts.push(
+          `<g transform="translate(${x + 4} ${y + 5}) scale(0.75)">` +
+            `<path d="${glyph.body}" fill="${ink}"/>${detail}</g>`,
+        );
+      }
+      const name = truncate(tile.name, textWidth, "600 12px ui-sans-serif, system-ui, sans-serif");
       parts.push(
-        `<text x="${x + 4}" y="${y + 4}" fill="rgba(11, 14, 20, 0.92)" ` +
+        `<text x="${textX}" y="${y + 4}" fill="rgba(11, 14, 20, 0.92)" ` +
           `font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="600" ` +
           `dominant-baseline="hanging">${escapeXml(name)}</text>`,
       );
       parts.push(
-        `<text x="${x + 4}" y="${y + 20}" fill="rgba(11, 14, 20, 0.92)" ` +
+        `<text x="${textX}" y="${y + 20}" fill="rgba(11, 14, 20, 0.92)" ` +
           `font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" ` +
           `dominant-baseline="hanging">${escapeXml(formatBytes(tile.size))}</text>`,
       );
       if (tile.label && h >= 36) {
         const label = truncate(
           tile.label,
-          w - 8,
+          textWidth,
           "italic 11px ui-sans-serif, system-ui, sans-serif",
         );
         parts.push(
-          `<text x="${x + 4}" y="${y + 36}" fill="rgba(11, 14, 20, 0.72)" ` +
+          `<text x="${textX}" y="${y + 36}" fill="rgba(11, 14, 20, 0.72)" ` +
             `font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" font-style="italic" ` +
             `dominant-baseline="hanging">${escapeXml(label)}</text>`,
         );

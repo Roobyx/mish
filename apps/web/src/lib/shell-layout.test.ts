@@ -29,6 +29,7 @@ function fakeRoot(): LayoutRoot {
 
 describe("layout catalogue", () => {
   test("ships a default and a floating layout", () => {
+    expect(DEFAULT_LAYOUT.id).toBe("floating");
     expect(LAYOUTS.length).toBeGreaterThanOrEqual(2);
     expect(LAYOUTS[0]).toBe(DEFAULT_LAYOUT);
     expect(new Set(LAYOUTS.map((layout) => layout.id)).size).toBe(LAYOUTS.length);

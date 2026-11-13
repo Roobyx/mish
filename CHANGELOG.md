@@ -2,6 +2,59 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.18.5] - 2026-11-13
+### Web
+- **Chart headers survive deep paths.** Breadcrumbs keep the current folder readable, collapse the middle of a long path into an ellipsis, and drop leading crumbs when space runs out.
+- **Header controls no longer wrap.** The drive summary yields space before the colour toggle and view summary, so the panel header stays on one line.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.18.4 → 1.18.5.
+
+## [1.18.4] - 2026-11-13
+### Web
+- **Tree rows use the header chevrons.** Expand and collapse now rotate the same chevron icon as the topbar menus, and sort indicators use matching chevrons.
+- **Tree columns are readable.** Fixed numeric column widths and tighter header typography keep Name, Allocated, Apparent and Items titles visible in the narrow panel.
+- **Resizable tree panel.** Drag the divider between the chart and the tree, or use the arrow keys when it is focused; the chosen share is saved in local storage.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.18.3 → 1.18.4.
+
+## [1.18.3] - 2026-11-13
+### Web
+- **Charts show file vs folder at a glance.** Treemap tiles, sunburst labels, icicle cells, bubbles and bars now carry a file/folder glyph, and their tooltips name the kind.
+- **Treemap payloads carry node kind.** Tile responses now include each node's kind, so the client can distinguish files from folders without an extra lookup.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.18.2 → 1.18.3.
+
+## [1.18.2] - 2026-11-13
+### Web
+- **Floating layout is now the default** for first-time visitors; the Classic layout remains
+available in Settings.
+- **Header theme switcher removed.** The topbar no longer carries a theme/layout menu.
+- **Footer theme link.** The status bar now shows only the active theme as a link that opens
+Settings → Appearance.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.18.1 → 1.18.2.
+
+## [1.18.1] - 2026-11-13
+### Web
+- **Status data no longer duplicated.** API, scan core and protocol details now live only in
+Settings; the sidebar and app footers no longer repeat them.
+- **Footers simplified.** The sidebar footer keeps the Settings entry, and the app footer shows
+only the active theme and layout.
+- **Runtime status in Settings.** The Runtime panel now also reports read-only access and the
+no-telemetry guarantee.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and Cargo workspace
+1.18.0 → 1.18.1.
+
 ## [1.18.0] - 2026-11-13
 ### Web
 - **Floating layout added.** A new shell layout places the navigation rail and workspace on a dotted

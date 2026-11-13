@@ -1,9 +1,12 @@
 <script lang="ts">
-  import type { Tile } from "@mish/api-types";
+  import type { NodeKind, Tile } from "@mish/api-types";
 
   import { colorForExtension, colorForKey, extensionOf, type ColorMode } from "../lib/color.js";
   import { formatBytes, percent } from "../lib/format.js";
+  import { kindLabel, nodeGlyph } from "../lib/node-glyph.js";
   import { tooltipStyle } from "../lib/tooltip.js";
+
+  import NodeIcon from "./NodeIcon.svelte";
 
   interface Props {
     tiles: Tile[];
@@ -41,6 +44,44 @@
     return `${text.slice(0, end)}…`;
   }
 
+  const glyphPaths = new Map<NodeKind, { body: Path2D; detail?: Path2D }>();
+
+  function pathsFor(kind: NodeKind): { body: Path2D; detail?: Path2D } {
+    const cached = glyphPaths.get(kind);
+    if (cached) return cached;
+    const glyph = nodeGlyph(kind);
+    const paths = {
+      body: new Path2D(glyph.body),
+      detail: glyph.detail ? new Path2D(glyph.detail) : undefined,
+    };
+    glyphPaths.set(kind, paths);
+    return paths;
+  }
+
+  function drawGlyph(
+    ctx: CanvasRenderingContext2D,
+    kind: NodeKind,
+    x: number,
+    y: number,
+    size: number,
+    surface: string,
+  ): void {
+    const glyph = nodeGlyph(kind);
+    const paths = pathsFor(kind);
+    const ink = "rgba(11, 14, 20, 0.82)";
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 16, size / 16);
+    ctx.fillStyle = ink;
+    ctx.fill(paths.body);
+    if (paths.detail) {
+      ctx.strokeStyle = glyph.detailStroke === "cut" ? surface : ink;
+      ctx.lineWidth = 1.2;
+      ctx.stroke(paths.detail);
+    }
+    ctx.restore();
+  }
+
   function draw(): void {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -67,16 +108,20 @@
       ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1));
 
       if (w >= 48 && h >= 20) {
+        const withIcon = w >= 64;
+        const textX = withIcon ? x + 20 : x + 4;
+        const textWidth = Math.max(0, w - (textX - x) - 4);
+        if (withIcon) drawGlyph(ctx, tile.kind, x + 4, y + 5, 12, tileFill(tile));
         ctx.fillStyle = "rgba(11, 14, 20, 0.92)";
         ctx.textBaseline = "top";
         ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
-        ctx.fillText(truncate(ctx, tile.name, w - 8), x + 4, y + 4);
+        ctx.fillText(truncate(ctx, tile.name, textWidth), textX, y + 4);
         ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
-        ctx.fillText(formatBytes(tile.size), x + 4, y + 20);
+        ctx.fillText(formatBytes(tile.size), textX, y + 20);
         if (tile.label && h >= 36) {
           ctx.fillStyle = "rgba(11, 14, 20, 0.72)";
           ctx.font = "italic 11px ui-sans-serif, system-ui, sans-serif";
-          ctx.fillText(truncate(ctx, tile.label, w - 8), x + 4, y + 36);
+          ctx.fillText(truncate(ctx, tile.label, textWidth), textX, y + 36);
         }
       }
     }
@@ -159,11 +204,14 @@
       class="tooltip"
       style={tooltipStyle({ x: pointerX, y: pointerY, width, height })}
     >
-      <strong>{hovered.name}</strong>
+      <strong>
+        <NodeIcon kind={hovered.kind} size={12} decorative />
+        <span class="tooltip-name">{hovered.name}</span>
+      </strong>
       {#if hovered.label}
         <span class="label">{hovered.label}</span>
       {/if}
-      <span>{formatBytes(hovered.size)} · {hoverPercent.toFixed(1)}%</span>
+      <span>{kindLabel(hovered.kind)} · {formatBytes(hovered.size)} · {hoverPercent.toFixed(1)}%</span>
     </div>
   {/if}
 </div>
@@ -205,12 +253,19 @@
   }
 
   .tooltip strong {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+
+  .tooltip-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .tooltip span {
+  .tooltip > span {
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }

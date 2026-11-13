@@ -29,7 +29,7 @@ export const openApiDocument = {
   openapi: "3.0.3",
   info: {
     title: "mish API",
-    version: "1.18.0",
+    version: "1.18.5",
     description:
       "Read-only disk-space analyzer and indexer. All endpoints are read-only except scan creation, cancellation, snapshot GC and schedules.",
     license: { name: "GPL-3.0-or-later" },

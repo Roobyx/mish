@@ -37,9 +37,8 @@
   import SchedulesPanel from "./components/SchedulesPanel.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
   import Spinner from "./components/Spinner.svelte";
-  import Sunburst from "./components/Sunburst.svelte";
-  import ThemeSwitcher from "./components/ThemeSwitcher.svelte";
-  import Treemap from "./components/Treemap.svelte";
+import Sunburst from "./components/Sunburst.svelte";
+import Treemap from "./components/Treemap.svelte";
   import {
     errorMessage,
     getChildren,
@@ -61,11 +60,19 @@
   import { type MishReport, reportTypeLabel } from "./lib/report.js";
   import {
     applyLayout,
-    layoutById,
     readStoredLayout,
     storeLayout,
     type LayoutId,
   } from "./lib/shell-layout.js";
+  import {
+    clampTreeShare,
+    DEFAULT_TREE_SHARE,
+    MAX_TREE_SHARE,
+    MIN_TREE_SHARE,
+    readStoredTreeShare,
+    storeTreeShare,
+    treeShareFromPointer,
+  } from "./lib/split-size.js";
   import {
     applyTheme,
     readStoredTheme,
@@ -303,6 +310,11 @@
   /** Selected shell layout, persisted in local storage. */
   let layout = $state<LayoutId>(readStoredLayout());
 
+  /** Tree panel share of the explore split, persisted in local storage. */
+  let treeShare = $state(readStoredTreeShare());
+  let splitEl = $state<HTMLElement | null>(null);
+  let resizingTree = $state(false);
+
   /** Node id whose overlay tree is shown in the Docker side panel, or null when closed. */
   let sideTreeNodeId = $state<number | null>(null);
 
@@ -351,7 +363,6 @@
         "Overview"),
   );
   const activeTheme = $derived(themeById(theme));
-  const activeLayout = $derived(layoutById(layout));
 
   function chooseTheme(id: ThemeId): void {
     theme = id;
@@ -363,6 +374,59 @@
     layout = id;
     applyLayout(id);
     storeLayout(id);
+  }
+
+  function persistTreeShare(share: number): void {
+    treeShare = clampTreeShare(share);
+    storeTreeShare(treeShare);
+  }
+
+  function startTreeResize(event: PointerEvent): void {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    resizingTree = true;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function moveTreeResize(event: PointerEvent): void {
+    if (!resizingTree || !splitEl) return;
+    const rect = splitEl.getBoundingClientRect();
+    const style = getComputedStyle(splitEl);
+    treeShare = treeShareFromPointer(event.clientX, {
+      left: rect.left,
+      width: rect.width,
+      paddingLeft: Number.parseFloat(style.paddingLeft) || 0,
+      paddingRight: Number.parseFloat(style.paddingRight) || 0,
+    });
+  }
+
+  function endTreeResize(event: PointerEvent): void {
+    if (!resizingTree) return;
+    resizingTree = false;
+    const target = event.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+    storeTreeShare(treeShare);
+  }
+
+  function resetTreeShare(): void {
+    persistTreeShare(DEFAULT_TREE_SHARE);
+  }
+
+  function handleTreeResizerKeydown(event: KeyboardEvent): void {
+    const step = event.shiftKey ? 0.08 : 0.02;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      persistTreeShare(treeShare + step);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      persistTreeShare(treeShare - step);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      persistTreeShare(MIN_TREE_SHARE);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      persistTreeShare(MAX_TREE_SHARE);
+    }
   }
 
   function go(next: ViewId): void {
@@ -938,25 +1002,6 @@
         <span class="nav-icon"><Icon name="settings" size={16} /></span>
         <span class="nav-text">Settings</span>
       </button>
-      <div class="status-line">
-        <span
-          class="status-dot"
-          class:ok={Boolean(health && !healthError)}
-          class:err={Boolean(healthError)}
-        ></span>
-        <span class="truncate">
-          {#if healthError}
-            API unreachable
-          {:else if health}
-            API {health.status}
-          {:else}
-            Connecting…
-          {/if}
-        </span>
-      </div>
-      <div class="status-line subtle">
-        <span class="truncate">protocol v{health?.protocol ?? "—"} · read-only</span>
-      </div>
     </div>
   </aside>
 
@@ -1020,9 +1065,6 @@
           <Icon name="search" size={16} />
           <span class="kbd">/</span>
         </button>
-        <span class="theme-slot">
-          <ThemeSwitcher {theme} onselect={chooseTheme} {layout} onlayout={chooseLayout} />
-        </span>
         <button type="button" class="action primary new-scan" onclick={openLauncher}>
           <Icon name="plus" size={15} />
           <span class="btn-label">New scan</span>
@@ -1232,7 +1274,12 @@
           </section>
         </main>
       {:else}
-        <main class="split">
+        <main
+          class="split"
+          class:resizing={resizingTree}
+          bind:this={splitEl}
+          style={`--tree-share: ${(treeShare * 100).toFixed(3)}%`}
+        >
           <section class="panel panel-viz">
             <div class="panel-head">
               <div class="panel-title">
@@ -1242,7 +1289,9 @@
                 </div>
               </div>
               <div class="panel-tools">
-                <DriveStats drive={activeDrive} />
+                <div class="drive-stats">
+                  <DriveStats drive={activeDrive} />
+                </div>
                 {#if view === "treemap"}
                   <div class="segmented" role="group" aria-label="Colour mode">
                     <button
@@ -1389,6 +1438,28 @@
             </div>
           </section>
 
+          <div
+            class="split-resizer"
+            class:dragging={resizingTree}
+            role="slider"
+            aria-orientation="vertical"
+            aria-label="Tree panel width"
+            aria-valuemin={Math.round(MIN_TREE_SHARE * 100)}
+            aria-valuemax={Math.round(MAX_TREE_SHARE * 100)}
+            aria-valuenow={Math.round(treeShare * 100)}
+            aria-valuetext={`${Math.round(treeShare * 100)}%`}
+            tabindex="0"
+            title="Drag to resize the tree · double-click to reset"
+            onpointerdown={startTreeResize}
+            onpointermove={moveTreeResize}
+            onpointerup={endTreeResize}
+            onpointercancel={endTreeResize}
+            ondblclick={resetTreeShare}
+            onkeydown={handleTreeResizerKeydown}
+          >
+            <span class="split-grip" aria-hidden="true"></span>
+          </div>
+
           <section class="panel panel-tree">
             <div class="panel-head">
               <div class="panel-title">
@@ -1415,29 +1486,16 @@
     </div>
 
     <footer class="statusbar">
-      <div class="statusbar-left">
-        <span
-          class="status-dot"
-          class:ok={Boolean(health && !healthError)}
-          class:err={Boolean(healthError)}
-        ></span>
-        <span class="truncate">
-          {#if healthError}
-            API unreachable
-          {:else if health}
-            API {health.status} · core {health.core.connected ? "connected" : "idle"}
-          {:else}
-            Connecting…
-          {/if}
-        </span>
-        <span class="dot-sep">·</span>
-        <span class="truncate">protocol v{health?.protocol ?? "—"}</span>
-      </div>
-      <div class="statusbar-right">
-        <span>read-only · no telemetry</span>
-        <span class="dot-sep">·</span>
-        <span>{activeTheme.name} · {activeLayout.name}</span>
-      </div>
+      <a
+        class="footer-link"
+        href="#view=settings"
+        onclick={(event) => {
+          event.preventDefault();
+          go("settings");
+        }}
+      >
+        {activeTheme.name}
+      </a>
     </footer>
   </div>
 
@@ -1628,37 +1686,6 @@
     border-top: 1px solid var(--border);
   }
 
-  .status-line {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0 0.55rem;
-    color: var(--muted);
-    font-size: 0.67rem;
-  }
-
-  .status-line.subtle {
-    color: var(--subtle);
-  }
-
-  .status-dot {
-    flex: none;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--subtle);
-  }
-
-  .status-dot.ok {
-    background: var(--ok);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 16%, transparent);
-  }
-
-  .status-dot.err {
-    background: var(--err);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 16%, transparent);
-  }
-
   .sidebar-scrim {
     position: fixed;
     inset: 0;
@@ -1724,10 +1751,6 @@
 
   .topbar .menu-toggle {
     display: none;
-  }
-
-  .theme-slot {
-    display: inline-flex;
   }
 
   .icon-button {
@@ -1944,20 +1967,25 @@
   .panel-head {
     display: flex;
     flex: none;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+    min-width: 0;
     min-height: 2.9rem;
     padding: 0.5rem 0.7rem;
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--panel) 92%, var(--panel-2));
+    container-type: inline-size;
   }
 
   .panel-title {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
+    overflow: hidden;
   }
 
   .panel-title h2 {
@@ -1983,11 +2011,25 @@
 
   .panel-tools {
     display: flex;
-    flex-wrap: wrap;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
     gap: 0.45rem;
     min-width: 0;
+    overflow: clip;
+    overflow-clip-margin: 4px;
+  }
+
+  .drive-stats {
+    display: flex;
+    min-width: 0;
+  }
+
+  @container (max-width: 820px) {
+    .drive-stats {
+      display: none;
+    }
   }
 
   .pill {
@@ -2007,11 +2049,69 @@
   .split {
     display: grid;
     flex: 1;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) 0.75rem minmax(0, var(--tree-share, 33.333%));
     min-height: 0;
     padding: 0.75rem;
     overflow: hidden;
+  }
+
+  .split.resizing {
+    cursor: col-resize;
+    user-select: none;
+  }
+
+  .split-resizer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.75rem;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: col-resize;
+    touch-action: none;
+    appearance: none;
+  }
+
+  .split-resizer::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    border-radius: 2px;
+    background: transparent;
+    content: "";
+    transform: translateX(-50%);
+    transition: background 120ms ease;
+  }
+
+  .split-grip {
+    position: relative;
+    width: 2px;
+    height: 2rem;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 120ms ease;
+  }
+
+  .split-resizer:hover::before,
+  .split-resizer:focus-visible::before,
+  .split-resizer.dragging::before {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .split-resizer:hover .split-grip,
+  .split-resizer:focus-visible .split-grip,
+  .split-resizer.dragging .split-grip {
+    background: var(--accent);
+  }
+
+  .split-resizer:focus-visible {
+    outline: none;
   }
 
   .panel-viz,
@@ -2032,8 +2132,11 @@
   }
 
   .crumbs {
+    display: flex;
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
+    container-type: inline-size;
   }
 
   .segmented {
@@ -2139,7 +2242,7 @@
     display: flex;
     flex: none;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 1rem;
     padding: 0.4rem 1rem;
     border-top: 1px solid var(--border);
@@ -2148,22 +2251,15 @@
     font-size: 0.67rem;
   }
 
-  .statusbar-left,
-  .statusbar-right {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    min-width: 0;
+  .footer-link {
+    color: inherit;
+    text-decoration: none;
   }
 
-  .dot-sep {
-    color: var(--border-strong);
-  }
-
-  .truncate {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .footer-link:hover,
+  .footer-link:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
   }
 
   .overlay {
@@ -2210,6 +2306,11 @@
     .split {
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: minmax(0, 1.35fr) minmax(0, 1fr);
+      row-gap: 0.75rem;
+    }
+
+    .split-resizer {
+      display: none;
     }
   }
 
@@ -2274,20 +2375,12 @@
       flex-direction: column;
     }
 
-    .statusbar-right {
-      display: none;
-    }
-
     .stat-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 560px) {
-    .theme-slot {
-      display: none;
-    }
-
     .page {
       padding: 0.75rem;
     }
