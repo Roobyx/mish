@@ -1,8 +1,17 @@
-# Publishes the mish images to GHCR on a version tag or a manual dispatch.
+# Publishes the mish images to GHCR when the version in package.json changes.
 #
-# Coolify deploys by pulling these images instead of building them. The server
-# image is published twice because MISH_WEB_BASE is compiled into the web
-# bundle: the default build serves at the origin root, and the `-path` build
+# Every push to main runs this workflow. If `v<version>` is not tagged yet, the
+# tag is created at the pushed commit and the images are built and pushed;
+# pushes that do not bump the version are a green no-op. Tag pushes are not a
+# trigger, so creating the tag from CI cannot loop, and a tag pushed with
+# GITHUB_TOKEN would not start another run anyway.
+#
+# `latest` therefore only ever points at a released version, not at arbitrary
+# main commits. Use the manual dispatch `force` input to republish an existing
+# version.
+#
+# The server image is published twice because MISH_WEB_BASE is compiled into the
+# web bundle: the default build serves at the origin root, and the `-path` build
 # serves under `/app/` for the stack behind Coolify's reverse proxy.
 #
 # arm64 is intentionally absent: the server Dockerfile runs the Rust test suite,
@@ -13,26 +22,78 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: ["main"]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and republish even when the version tag already exists
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
-
-permissions:
-  contents: write
-  packages: write
 
 env:
   # Must stay lowercase; GHCR rejects uppercase repository paths.
   IMAGE_BASE: ghcr.io/roobyx/mish
 
 jobs:
+  tag:
+    name: Tag release
+    # A manual dispatch from a branch would tag unreleased code as `latest`, so
+    # only the default branch may produce a release.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      tag: ${{ steps.version.outputs.tag }}
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags have to be visible to tell a new version from a released one.
+          fetch-depth: 0
+
+      - name: Read the version
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version package.json)
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether the version is already released
+        id: check
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ steps.version.outputs.tag }} already exists; nothing to release"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the tag
+        if: steps.check.outputs.release == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "mish ${{ steps.version.outputs.value }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
   publish:
     name: ${{ matrix.label }}
+    needs: tag
+    if: needs.tag.outputs.release == 'true' || inputs.force == true
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -52,16 +113,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read and verify version
-        id: version
-        run: |
-          version=$(jq -r .version package.json)
-          echo "value=$version" >> "$GITHUB_OUTPUT"
-          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
-
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -79,10 +130,10 @@ jobs:
             suffix=${{ matrix.suffix }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.version.outputs.value }}
+            org.opencontainers.image.version=${{ needs.tag.outputs.version }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.value }}
-            type=raw,value=latest,enable=${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
+            type=raw,value=${{ needs.tag.outputs.version }}
+            type=raw,value=latest
             type=sha,format=short
 
       - uses: docker/build-push-action@v6
@@ -97,35 +148,40 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}${{ matrix.suffix }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}${{ matrix.suffix }}
 
-  # The Unraid template pins the image tag, so a release has to move it or CA
-  # installs stay on the version they were first added with.
-  sync-unraid:
-    name: Sync Unraid template
-    needs: publish
-    if: github.ref_type == 'tag'
+  # Deploy files pin an image tag, so a release has to move those pins or the
+  # stores and the Coolify stack stay on the version they were first added with.
+  # The commit is pushed with GITHUB_TOKEN, which does not start another run.
+  sync-pins:
+    name: Sync deploy pins
+    needs: [tag, publish]
+    if: needs.tag.outputs.release == 'true' || inputs.force == true
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Point the template at the release
+      - name: Point the pins at the release
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          set -euo pipefail
           main_version=$(jq -r .version package.json)
-          if [[ "$main_version" != "$version" ]]; then
-            echo "main is at $main_version and this release is $version; leaving the template alone"
+          if [[ "$main_version" != "$VERSION" ]]; then
+            echo "main is at $main_version and this release is $VERSION; leaving the pins alone"
             exit 0
           fi
-          xml=deploy/stores/unraid/mish.xml
-          sed -i -E "s#(<Repository>ghcr\.io/roobyx/mish/server:)[^<]+(</Repository>)#\1${version}\2#" "$xml"
-          if git diff --quiet -- "$xml"; then
-            echo "template already points at $version"
+          sed -i -E "s#(<Repository>ghcr\.io/roobyx/mish/server:)[^<]+(</Repository>)#\1${VERSION}\2#" deploy/stores/unraid/mish.xml
+          sed -i -E "s#(MISH_TAG:-)[0-9]+\.[0-9]+\.[0-9]+#\1${VERSION}#g" coolify-compose.yml
+          if git diff --quiet -- deploy/stores/unraid/mish.xml coolify-compose.yml; then
+            echo "deploy pins already point at $VERSION"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$xml"
-          git commit -m "Point the Unraid template at ${version}"
+          git add deploy/stores/unraid/mish.xml coolify-compose.yml
+          git commit -m "Point the deploy pins at ${VERSION}"
           git push origin main

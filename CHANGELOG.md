@@ -2,6 +2,19 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.20.1] - 2026-11-17
+### Release
+- **Releases run on push to main.** The Release workflow now triggers on `main` instead of `v*` tags:
+  it reads the version from `package.json`, creates and pushes `v<version>` when that tag is missing,
+  and only then builds and publishes the images. Pushes without a version bump are a green no-op, so
+  `latest` always matches a released version; a manual dispatch with `force` republishes an existing one.
+- **Deploy pins follow the release.** The post-build job moves both the Unraid template and the
+  `MISH_TAG` defaults in `coolify-compose.yml` to the released version, instead of only the Unraid
+  template.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.20.0 → 1.20.1.
+
 ## [1.20.0] - 2026-11-17
 ### CLI
 - **`mish tui --view treemap`.** The current scope is squarified with the same algorithm as the
