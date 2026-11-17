@@ -1,11 +1,12 @@
 # Coolify deployment of the mish stack.
 #
+# Images are built and published to GHCR by .github/workflows/release.yml, so
+# this file pulls them instead of building on the deployment server. Use the
+# root docker-compose.yml or deploy/compose/docker-compose.yml to build locally.
+#
 # Coolify's built-in proxy is not used. The app and site publish host ports and
 # an external reverse proxy routes the site to MISH_SITE_PORT and the app under
-# a path prefix to MISH_PORT (the image is built with MISH_WEB_BASE).
-#
-# Images are tagged for GHCR so a build can be pushed with `docker compose push`
-# and matches the release workflow.
+# a path prefix to MISH_PORT (the `-path` tag is the MISH_WEB_BASE=/app/ build).
 
 services:
   mish:
@@ -14,12 +15,8 @@ services:
     # caps so the core and Bun can read hosts whose /mnt is not world-readable
     # and write their own mish-owned data directory.
     user: "0:0"
-    build:
-      context: .
-      dockerfile: deploy/docker/Dockerfile.server
-      args:
-        MISH_WEB_BASE: /app/
-    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-1.18.6}-path
+    pull_policy: always
     ports:
       - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-9543}:9543"
     environment:
@@ -66,10 +63,8 @@ services:
     restart: unless-stopped
 
   mish-site:
-    build:
-      context: .
-      dockerfile: deploy/docker/Dockerfile.site
-    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
+    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-1.18.6}
+    pull_policy: always
     ports:
       - "${MISH_SITE_PORT:-3300}:80"
     healthcheck:

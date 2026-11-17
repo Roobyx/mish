@@ -11,6 +11,9 @@ All notable changes to mish are documented here. Newest entries first.
 - **The server image also ships as `-path`.** `MISH_WEB_BASE` is compiled into the web bundle, so the
   `/app/`-prefixed variant used behind Coolify's reverse proxy is published under a separate tag
   rather than replacing the origin-root build.
+- **`coolify-compose.yml` pulls instead of builds.** Both services reference the published tags
+  (`server:<version>-path` and `site:<version>`) with `pull_policy: always`; local builds keep using
+  the root or `deploy/compose` compose files.
 ### Version updates
 - Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
   1.18.5 → 1.18.6.
