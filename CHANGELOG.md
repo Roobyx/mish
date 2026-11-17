@@ -2,6 +2,33 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.20.0] - 2026-11-17
+### CLI
+- **`mish tui --view treemap`.** The current scope is squarified with the same algorithm as the
+  web client, drawn with shared box-drawing borders, a label and size per tile, and a tail folded
+  into one `other` tile so no rectangle falls below a cell.
+- **`mish tui --view histogram`.** Size buckets render as columns with eighth-block tops, an axis,
+  labels and item counts; `--dim` selects `size`, `ext`, `age` or `owner`, and open-ended
+  dimensions keep the eight largest buckets plus an aggregate.
+- **One browser for all three charts.** `v` cycles views, `d` cycles the histogram dimension,
+  `--json` returns tiles or buckets, and the chart views size themselves from the terminal and
+  fall back to apparent size when the filesystem reports no allocation data.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.19.0 → 1.20.0.
+
+## [1.19.0] - 2026-11-17
+### Deployment
+- **Unraid Community Applications template.** `deploy/stores/unraid/` carries the container template
+  and repository profile. It mounts `/mnt` read-only at `/host/mnt` so the array, cache and pools
+  appear as drives, pins the release image, and the release workflow moves that pin on every `v*` tag.
+- **`MISH_ALLOWED_HOSTS=*` accepts any Host header.** Store and reverse proxies that rewrite Host
+  were rejected with `forbidden_host`; the wildcard is opt-in and the bearer token and Origin checks
+  still apply.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.18.6 → 1.19.0.
+
 ## [1.18.6] - 2026-11-17
 ### Deployment
 - **Release workflow publishes images to GHCR.** Pushing a `v*` tag, or running it manually from

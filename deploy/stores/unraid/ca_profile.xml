@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<CommunityApplications>
+  <Profile>Community Applications templates for mish, a headless, read-only disk-space analyzer and indexer.</Profile>
+  <Icon>https://raw.githubusercontent.com/Roobyx/mish/main/deploy/stores/unraid/icon.png</Icon>
+  <WebPage>https://github.com/Roobyx/mish</WebPage>
+</CommunityApplications>

@@ -15,7 +15,7 @@ use serde_json::json;
 use mish_core::daemon::{serve, Daemon};
 use mish_core::docker::DockerCollector;
 use mish_core::index::{IndexReader, Kind, NO_PARENT};
-use mish_core::query::{FindFilters, Metric, NodeView, QueryEngine, SortBy};
+use mish_core::query::{Bucket, FindFilters, Metric, NodeView, QueryEngine, SortBy};
 use mish_core::store::Store;
 use mish_core::Config as CoreConfig;
 #[cfg(unix)]
@@ -135,6 +135,12 @@ enum Command {
         metric: Option<String>,
         #[arg(long)]
         sort: Option<String>,
+        /// Chart to draw: bars, treemap or histogram.
+        #[arg(long, default_value = "bars", value_parser = ["bars", "treemap", "histogram"])]
+        view: String,
+        /// Histogram dimension: size, ext, age or owner.
+        #[arg(long, default_value = "size", value_parser = ["size", "ext", "age", "owner"])]
+        dim: String,
     },
     /// Extension breakdown.
     Ext { path: Option<String> },
@@ -276,6 +282,8 @@ fn main() -> ExitCode {
             limit,
             metric,
             sort,
+            view,
+            dim,
         } => cmd_tui(
             json,
             &cli,
@@ -283,6 +291,8 @@ fn main() -> ExitCode {
             limit.unwrap_or(40),
             metric.as_deref().unwrap_or("alloc"),
             sort.as_deref().unwrap_or("size"),
+            view,
+            dim,
         ),
         Command::Docker { stats } => cmd_docker(json, *stats),
         Command::Diff { a, b } => cmd_diff(json, &cli, a, b),
@@ -771,6 +781,7 @@ fn csv_escape(value: &str) -> String {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_tui(
     json: bool,
     cli: &Cli,
@@ -778,6 +789,8 @@ fn cmd_tui(
     limit: usize,
     metric: &str,
     sort: &str,
+    view: &str,
+    dim: &str,
 ) -> anyhow::Result<()> {
     use std::io::{BufRead, BufReader};
 
@@ -788,6 +801,8 @@ fn cmd_tui(
     let mut scope = resolve_scope(&reader, path)?;
     let mut metric = Metric::parse(metric);
     let mut sort = SortBy::parse(sort);
+    let mut view = tui::View::parse(view);
+    let mut dim = normalize_dim(dim);
     let mut limit = limit;
     let mut offset = 0usize;
     let mut selected = 0usize;
@@ -796,21 +811,69 @@ fn cmd_tui(
     let mut children = ordered_children(&engine, scope, sort);
     let mut cached_scope = scope;
     let mut cached_sort = sort;
+    // The treemap and histogram need a size-ordered child list and a subtree
+    // aggregation. Both are cached per scope so paging keys stay cheap.
+    let mut charts = Charts::default();
     let mut rows = page_of(&children, limit, offset);
 
     if json {
-        let records: Vec<_> = rows.iter().map(NodeView::to_record).collect();
-        let value = json!({ "scope": scope, "items": records });
+        let value = match view {
+            tui::View::Bars => json!({
+                "scope": scope,
+                "view": view.as_str(),
+                "items": rows.iter().map(NodeView::to_record).collect::<Vec<_>>(),
+            }),
+            tui::View::Treemap => {
+                let sized = charts.sized(&engine, scope);
+                let tiles = treemap_tiles(sized, effective_metric(sized, metric), TREEMAP_TILES);
+                json!({
+                    "scope": scope,
+                    "view": view.as_str(),
+                    "tiles": tiles
+                        .iter()
+                        .map(|tile| json!({
+                            "name": tile.name,
+                            "size": tile.value,
+                            "x": tile.x,
+                            "y": tile.y,
+                            "w": tile.w,
+                            "h": tile.h,
+                        }))
+                        .collect::<Vec<_>>(),
+                })
+            }
+            tui::View::Histogram => {
+                let buckets = charts.buckets(&engine, scope, dim.as_str());
+                json!({
+                    "scope": scope,
+                    "view": view.as_str(),
+                    "dim": dim,
+                    "buckets": buckets
+                        .iter()
+                        .map(|bucket| json!({
+                            "key": bucket.key,
+                            "label": bucket.label,
+                            "count": bucket.count,
+                            "size": bucket.size,
+                        }))
+                        .collect::<Vec<_>>(),
+                })
+            }
+        };
         println!("{}", serde_json::to_string(&value)?);
         return Ok(());
     }
 
-    render_tui(
+    render_view(
         &reader,
         id.as_str(),
         scope,
+        view,
+        dim.as_str(),
         &children,
         &rows,
+        &mut charts,
+        &engine,
         metric,
         selected,
     );
@@ -833,16 +896,26 @@ fn cmd_tui(
                 selected = 0;
             }
             tui::Nav::Open => {
-                if let Some(child) = child_scope(&rows, selected) {
+                let list: &[NodeView] = if view == tui::View::Treemap {
+                    charts.sized(&engine, scope)
+                } else {
+                    &rows
+                };
+                if let Some(child) = child_scope(list, selected) {
                     scope = child;
                     offset = 0;
                     selected = 0;
                 }
             }
             tui::Nav::Select(n) => {
-                if n > 0 && n <= rows.len() {
+                let list: &[NodeView] = if view == tui::View::Treemap {
+                    charts.sized(&engine, scope)
+                } else {
+                    &rows
+                };
+                if n > 0 && n <= list.len() {
                     let index = n - 1;
-                    if let Some(child) = child_scope(&rows, index) {
+                    if let Some(child) = child_scope(list, index) {
                         scope = child;
                         offset = 0;
                         selected = 0;
@@ -876,6 +949,13 @@ fn cmd_tui(
                     limit -= 20;
                 }
             }
+            tui::Nav::View => {
+                view = view.next();
+                selected = 0;
+            }
+            tui::Nav::Dim => {
+                dim = next_dim(dim.as_str());
+            }
             tui::Nav::Unnown => {}
         }
         if scope != cached_scope || sort != cached_sort {
@@ -884,12 +964,16 @@ fn cmd_tui(
             cached_sort = sort;
         }
         rows = page_of(&children, limit, offset);
-        render_tui(
+        render_view(
             &reader,
             id.as_str(),
             scope,
+            view,
+            dim.as_str(),
             &children,
             &rows,
+            &mut charts,
+            &engine,
             metric,
             selected,
         );
@@ -910,7 +994,18 @@ fn ordered_children(engine: &QueryEngine<'_>, scope: u32, sort: SortBy) -> Vec<N
         SortBy::Mtime => {
             rows.sort_by_key(|a| std::cmp::Reverse(a.mtime_ms));
         }
-        SortBy::Size => {}
+        SortBy::Size => {
+            // Filesystems without allocation data report zero for every node,
+            // so the core's ranking collapses to name order; rank by apparent
+            // size instead of showing an alphabetical "largest" list.
+            if rows.iter().all(|row| row.size_alloc == 0) {
+                rows.sort_by(|a, b| {
+                    b.size_apparent
+                        .cmp(&a.size_apparent)
+                        .then_with(|| a.name.cmp(&b.name))
+                });
+            }
+        }
     }
     rows
 }
@@ -928,8 +1023,76 @@ fn page_of(all: &[NodeView], limit: usize, offset: usize) -> Vec<NodeView> {
     page
 }
 
+/// Upper bound on treemap tiles; the live budget also scales with the canvas so
+/// every tile keeps room for a border and a label.
+const TREEMAP_TILES: usize = 120;
+const TREEMAP_MIN_TILES: usize = 16;
+
+/// Histogram columns before the tail is folded into `other`.
+const HISTOGRAM_COLUMNS: usize = 8;
+
+/// Per-scope caches for the chart views. The bars need a page, but the treemap
+/// needs every child and the histogram needs a subtree aggregation, so both are
+/// built once and reused until the scope or the dimension changes.
+#[derive(Default)]
+struct Charts {
+    sized: Vec<NodeView>,
+    sized_scope: Option<u32>,
+    buckets: Vec<Bucket>,
+    bucket_key: Option<(u32, String)>,
+}
+
+impl Charts {
+    fn sized(&mut self, engine: &QueryEngine<'_>, scope: u32) -> &[NodeView] {
+        if self.sized_scope != Some(scope) {
+            self.sized = ordered_children(engine, scope, SortBy::Size);
+            self.sized_scope = Some(scope);
+        }
+        &self.sized
+    }
+
+    fn buckets(&mut self, engine: &QueryEngine<'_>, scope: u32, dim: &str) -> &[Bucket] {
+        let stale = match &self.bucket_key {
+            Some((cached_scope, cached_dim)) => *cached_scope != scope || cached_dim != dim,
+            None => true,
+        };
+        if stale {
+            self.buckets = histogram_buckets(engine, scope, dim);
+            self.bucket_key = Some((scope, dim.to_string()));
+        }
+        &self.buckets
+    }
+}
+
+/// Draw one frame of whichever view is active.
 #[allow(clippy::too_many_arguments)]
-fn render_tui(
+fn render_view(
+    reader: &IndexReader,
+    snapshot: &str,
+    scope: u32,
+    view: tui::View,
+    dim: &str,
+    all: &[NodeView],
+    rows: &[NodeView],
+    charts: &mut Charts,
+    engine: &QueryEngine<'_>,
+    metric: Metric,
+    selected: usize,
+) {
+    match view {
+        tui::View::Bars => render_bars(reader, snapshot, scope, all, rows, metric, selected),
+        tui::View::Treemap => {
+            let sized = charts.sized(engine, scope);
+            render_treemap(reader, snapshot, scope, sized, metric);
+        }
+        tui::View::Histogram => {
+            let buckets = charts.buckets(engine, scope, dim);
+            render_histogram(reader, snapshot, scope, buckets, dim);
+        }
+    }
+}
+
+fn render_bars(
     reader: &IndexReader,
     snapshot: &str,
     scope: u32,
@@ -938,6 +1101,7 @@ fn render_tui(
     metric: Metric,
     selected: usize,
 ) {
+    let metric = effective_metric(rows, metric);
     let mut max = 0u64;
     let mut display: Vec<tui::Row> = Vec::new();
     for row in rows.iter() {
@@ -952,10 +1116,12 @@ fn render_tui(
         });
     }
 
+    let (width, _) = term_size();
+    let bar_width = width.saturating_sub(44).clamp(12, 60);
     let crumb = path_of(reader, scope);
-    let header = format!("mish tui · {snapshot}");
+    let header = format!("mish tui · {snapshot} · bars");
     let footer = format!(
-        "{} children · {} shown · j/k page · u up · g root · <n> open · s sort · m metric · q quit",
+        "{} children · {} shown · j/k page · u up · g root · <n> open · s sort · m metric · v view · q quit",
         all.len(),
         rows.len(),
     );
@@ -966,11 +1132,270 @@ fn render_tui(
             crumb.as_str(),
             &display,
             max,
-            24,
+            bar_width,
             selected,
             footer.as_str(),
         )
     );
+}
+
+fn render_treemap(
+    reader: &IndexReader,
+    snapshot: &str,
+    scope: u32,
+    sized: &[NodeView],
+    metric: Metric,
+) {
+    let (width, height) = term_size();
+    let budget = treemap_budget(width, height.saturating_sub(3));
+    let metric = effective_metric(sized, metric);
+    let tiles = treemap_tiles(sized, metric, budget);
+    let total: u64 = sized.iter().map(|row| value_of(row, metric)).sum();
+    let hidden = sized.len().saturating_sub(budget);
+    let crumb = path_of(reader, scope);
+    let header = format!("mish tui · {snapshot} · treemap");
+    let tail = if hidden > 0 {
+        format!("top {budget} + other")
+    } else {
+        format!("{} tiles", tiles.len())
+    };
+    let footer = format!(
+        "{} children · {tail} · {} · v view · <n> open · u up · g root · q quit",
+        sized.len(),
+        tui::human_size(total),
+    );
+    println!(
+        "{}",
+        tui::treemap_frame(
+            header.as_str(),
+            crumb.as_str(),
+            &tiles,
+            width,
+            height,
+            footer.as_str(),
+        )
+    );
+}
+
+fn render_histogram(
+    reader: &IndexReader,
+    snapshot: &str,
+    scope: u32,
+    buckets: &[Bucket],
+    dim: &str,
+) {
+    let items: u64 = buckets.iter().map(|bucket| bucket.count).sum();
+    let total: u64 = buckets.iter().map(|bucket| bucket.size).sum();
+    // Filesystems without allocation data report zero sizes, so fall back to
+    // item counts rather than drawing a flat chart.
+    let sized = total > 0;
+    let columns: Vec<tui::HistogramBucket> = buckets
+        .iter()
+        .map(|bucket| tui::HistogramBucket {
+            label: bucket.label.clone(),
+            size: if sized { bucket.size } else { bucket.count },
+            count: bucket.count,
+        })
+        .collect();
+    let (width, height) = term_size();
+    let crumb = path_of(reader, scope);
+    let header = format!("mish tui · {snapshot} · histogram");
+    let scale = if sized {
+        tui::human_size(total)
+    } else {
+        "by item count".to_string()
+    };
+    let footer =
+        format!("{dim} · {scale} · {items} items · d dim · v view · u up · g root · q quit");
+    println!(
+        "{}",
+        tui::histogram_frame(
+            header.as_str(),
+            crumb.as_str(),
+            &columns,
+            width,
+            height,
+            footer.as_str(),
+        )
+    );
+}
+
+/// Filesystems without allocation data report `size_alloc = 0` for every node,
+/// which would leave the charts empty; fall back to apparent size when that is
+/// the only metric with data.
+fn effective_metric(rows: &[NodeView], metric: Metric) -> Metric {
+    let total: u64 = rows.iter().map(|row| value_of(row, metric)).sum();
+    if total > 0 || metric == Metric::Apparent {
+        return metric;
+    }
+    let apparent: u64 = rows.iter().map(|row| row.size_apparent).sum();
+    if apparent > 0 {
+        Metric::Apparent
+    } else {
+        metric
+    }
+}
+
+/// Tiles to lay out for a canvas: roughly one per 40 cells, so the smallest
+/// still has space for a border and a two-line label.
+fn treemap_budget(width: usize, rows: usize) -> usize {
+    ((width * rows) / 40).clamp(TREEMAP_MIN_TILES, TREEMAP_TILES)
+}
+
+/// Squarify the largest `limit` children, folding the tail into one `other`
+/// tile so the layout never produces sub-cell rectangles.
+fn treemap_tiles(rows: &[NodeView], metric: Metric, limit: usize) -> Vec<tui::Tile> {
+    let mut items: Vec<(String, u64)> = rows
+        .iter()
+        .map(|row| (row.name.clone(), value_of(row, metric)))
+        .filter(|(_, value)| *value > 0)
+        .collect();
+    items.sort_by_key(|item| std::cmp::Reverse(item.1));
+
+    let mut tiles: Vec<(String, u64)> = items.iter().take(limit).cloned().collect();
+    let hidden: u64 = items.iter().skip(limit).map(|(_, value)| *value).sum();
+    if hidden > 0 {
+        tiles.push(("other".to_string(), hidden));
+    }
+
+    let values: Vec<f64> = tiles.iter().map(|(_, value)| *value as f64).collect();
+    let rects = mish_core::query::squarify(&values);
+    tiles
+        .into_iter()
+        .zip(rects)
+        .map(|((name, value), rect)| tui::Tile {
+            name,
+            value,
+            x: rect[0] as f32,
+            y: rect[1] as f32,
+            w: rect[2] as f32,
+            h: rect[3] as f32,
+        })
+        .collect()
+}
+
+/// Aggregate a subtree by dimension, keeping the biggest buckets and folding
+/// the long tail so the chart stays readable.
+fn histogram_buckets(engine: &QueryEngine<'_>, scope: u32, dim: &str) -> Vec<Bucket> {
+    // Size and age buckets come from ordered edges, so their order is the axis.
+    if dim == "size" {
+        let mut buckets = engine.histogram(scope, dim);
+        // The core buckets the `size` dimension by allocated bytes. Filesystems
+        // without allocation data report zero for every file, which would pile
+        // the whole subtree into `0-1 KB`; bucket apparent sizes instead.
+        if buckets.iter().all(|bucket| bucket.size == 0) {
+            buckets = apparent_size_buckets(engine.reader(), scope);
+        }
+        return buckets;
+    }
+    if dim == "age" {
+        return engine.histogram(scope, dim);
+    }
+
+    // Extension and owner buckets are open-ended, so keep the biggest and fold
+    // the tail into one column.
+    let mut buckets = engine.histogram(scope, dim);
+    buckets.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.key.cmp(&b.key)));
+    if buckets.len() > HISTOGRAM_COLUMNS {
+        let tail = buckets.split_off(HISTOGRAM_COLUMNS - 1);
+        let size = tail.iter().map(|bucket| bucket.size).sum();
+        let count = tail.iter().map(|bucket| bucket.count).sum();
+        buckets.push(Bucket {
+            key: "other".to_string(),
+            label: format!("other ({})", tail.len()),
+            count,
+            size,
+        });
+    }
+    buckets
+}
+
+/// Apparent-size buckets, mirroring the core's size histogram edges.
+fn apparent_size_buckets(reader: &IndexReader, scope: u32) -> Vec<Bucket> {
+    const KB: u64 = 1024;
+    let edges: [(u64, &str); 8] = [
+        (KB, "0-1 KB"),
+        (10 * KB, "1-10 KB"),
+        (100 * KB, "10-100 KB"),
+        (KB * KB, "100 KB-1 MB"),
+        (10 * KB * KB, "1-10 MB"),
+        (100 * KB * KB, "10-100 MB"),
+        (KB * KB * KB, "100 MB-1 GB"),
+        (u64::MAX, ">1 GB"),
+    ];
+    let mut counts = vec![(0u64, 0u64); edges.len()];
+    for id in reader.subtree_range(scope) {
+        let Some(rec) = reader.record(id) else {
+            continue;
+        };
+        if rec.kind.is_dir() {
+            continue;
+        }
+        let size = rec.size_app;
+        if let Some(slot) = edges.iter().position(|(limit, _)| size < *limit) {
+            counts[slot].0 += 1;
+            counts[slot].1 = counts[slot].1.saturating_add(size);
+        }
+    }
+    edges
+        .iter()
+        .enumerate()
+        .map(|(index, (_, label))| Bucket {
+            key: (*label).to_string(),
+            label: (*label).to_string(),
+            count: counts[index].0,
+            size: counts[index].1,
+        })
+        .collect()
+}
+
+fn normalize_dim(dim: &str) -> String {
+    match dim.trim().to_ascii_lowercase().as_str() {
+        "ext" | "extension" | "type" => "ext".to_string(),
+        "age" | "mtime" => "age".to_string(),
+        "owner" | "user" => "owner".to_string(),
+        _ => "size".to_string(),
+    }
+}
+
+fn next_dim(dim: &str) -> String {
+    match dim {
+        "size" => "ext".to_string(),
+        "ext" => "age".to_string(),
+        "age" => "owner".to_string(),
+        _ => "size".to_string(),
+    }
+}
+
+/// Terminal size for the chart views: `COLUMNS`/`LINES` when set, then the tty
+/// window size, then a 100x32 default.
+fn term_size() -> (usize, usize) {
+    let (detected_width, detected_height) = detect_size().unwrap_or((100, 32));
+    let width = std::env::var("COLUMNS")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(detected_width);
+    let height = std::env::var("LINES")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(detected_height);
+    (width.clamp(40, 400), height.clamp(10, 200))
+}
+
+#[cfg(unix)]
+fn detect_size() -> Option<(usize, usize)> {
+    let mut size: libc::winsize = unsafe { std::mem::zeroed() };
+    let result = unsafe { libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut size) };
+    if result == 0 && size.ws_col > 0 && size.ws_row > 0 {
+        Some((usize::from(size.ws_col), usize::from(size.ws_row)))
+    } else {
+        None
+    }
+}
+
+#[cfg(not(unix))]
+fn detect_size() -> Option<(usize, usize)> {
+    None
 }
 
 fn value_of(node: &NodeView, metric: Metric) -> u64 {

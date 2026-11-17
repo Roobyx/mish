@@ -10,7 +10,7 @@ Scan a filesystem once, then explore it as an interactive treemap in your browse
 Read-only, Docker-aware, JSON-first, and built for servers.
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.18.6-informational?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.19.0-informational?style=flat-square)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)](#requirements)
 [![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](#quick-start)
 [![No telemetry](https://img.shields.io/badge/telemetry-none-success?style=flat-square)](#security-model)
@@ -194,6 +194,8 @@ mish diff <older-snapshot> <newer-snapshot> --json
 
 # Terminal UI
 mish tui --data-dir ./data
+mish tui --view treemap --data-dir ./data
+mish tui --view histogram --dim ext --data-dir ./data
 
 # Daemon for the API server
 mish daemon --socket /tmp/mish.sock --data-dir ./data
@@ -208,7 +210,7 @@ mish daemon --socket /tmp/mish.sock --data-dir ./data
 | `top [path]` | Largest entries (`-n`, `--kind`, `--metric`) |
 | `find [path]` | Filter by size, mtime, extension, owner or duplicate status |
 | `tree [path]` | Print the hierarchy (`--depth`) |
-| `tui [path]` | Browse children as sized bars |
+| `tui [path]` | Browse in the terminal: `--view bars\|treemap\|histogram`, `--dim size\|ext\|age\|owner` |
 | `ext [path]` | Extension breakdown |
 | `diff <a> <b>` | Growth and shrink between snapshots |
 | `docker` | Containers, sizes and mounts (`--stats`) |

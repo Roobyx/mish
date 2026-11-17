@@ -142,6 +142,21 @@ describe("server API", () => {
     expect(res.status).not.toBe(403);
   });
 
+  test("wildcard allowed hosts accept a store proxy host", async () => {
+    const core = new StubCore(() => ({}));
+    const strict = createApp({ config: { ...config(), allowedHosts: [] }, core });
+    const rejected = await strict.request("/api/v1/scans", {
+      headers: { host: "casaos.local:9543" },
+    });
+    expect(rejected.status).toBe(403);
+
+    const open = createApp({ config: { ...config(), allowedHosts: ["*"] }, core });
+    const allowed = await open.request("/api/v1/scans", {
+      headers: { host: "casaos.local:9543" },
+    });
+    expect(allowed.status).toBe(200);
+  });
+
   test("clamps export limits", async () => {
     const core = new StubCore(() => ({ items: [] }));
     const app = createApp({ config: config(), core });

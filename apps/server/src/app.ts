@@ -109,6 +109,10 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       host.toLowerCase(),
     ),
   );
+  // `*` disables the Host allow-list for app-store installs and reverse proxies
+  // that rewrite Host. The bearer token and Origin checks still apply.
+  const anyHost = allowedHosts.has("*");
+  const hostAllowed = (host: string) => anyHost || allowedHosts.has(host);
   const trustProxy = config.trustProxy ?? false;
   const maxSse = config.maxSseConnections ?? 32;
   const maxBody = config.maxBodyBytes ?? 1_048_576;
@@ -164,7 +168,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
   // container healthcheck can run without a token.
   app.use("/api/v1/*", async (c, next) => {
     const host = hostnameOf(requestHost(c));
-    if (!host || !allowedHosts.has(host)) {
+    if (!host || !hostAllowed(host)) {
       return c.json({ error: "forbidden_host" }, 403);
     }
 
@@ -187,7 +191,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         // A trusted proxy may rewrite Host to the backend address. In that case
         // accept an Origin that matches a configured allowed host.
         if (!expected || originHostname !== expected) {
-          if (!(trustProxy && originHostname && allowedHosts.has(originHostname))) {
+          if (!(trustProxy && originHostname && hostAllowed(originHostname))) {
             return c.json({ error: "cross_origin_request" }, 403);
           }
         }

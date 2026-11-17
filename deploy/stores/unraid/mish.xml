@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>mish</Name>
+  <Repository>ghcr.io/roobyx/mish/server:1.19.0</Repository>
+  <Registry>https://github.com/Roobyx/mish/pkgs/container/mish%2Fserver</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Roobyx/mish/issues</Support>
+  <Project>https://github.com/Roobyx/mish</Project>
+  <Overview>Scan a filesystem once, then explore it as an interactive treemap in your browser. Read-only, Docker-aware, JSON-first, and built for servers.[br][br]/mnt is mounted read-only at /host/mnt, so the array, cache and pools show up as drives. Narrow it with the Host filesystem path if you only want one share. Docker usage comes from the read-only Docker socket.[br][br]First login: paste the API token from MISH_AUTH_TOKEN, or leave it empty and read /mnt/user/appdata/mish/auth-token after the first start.</Overview>
+  <Category>Tools:</Category>
+  <WebUI>http://[IP]:[PORT:9543]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/Roobyx/mish/main/deploy/stores/unraid/mish.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/Roobyx/mish/main/deploy/stores/unraid/icon.png</Icon>
+  <ExtraParams>--cap-drop=ALL --cap-add=DAC_READ_SEARCH --cap-add=DAC_OVERRIDE --security-opt=no-new-privileges=true --user=0:0</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Description/>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish/>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/mish</HostDir>
+      <ContainerDir>/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt</HostDir>
+      <ContainerDir>/host/mnt</ContainerDir>
+      <Mode>ro</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/var/run/docker.sock</HostDir>
+      <ContainerDir>/var/run/docker.sock</ContainerDir>
+      <Mode>ro</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>/data</Value>
+      <Name>MISH_DATA_DIR</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>0.0.0.0:9543</Value>
+      <Name>MISH_BIND</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/run/mish/mish.sock</Value>
+      <Name>MISH_CORE_SOCKET</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/host/mnt</Value>
+      <Name>MISH_ROOTS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/host</Value>
+      <Name>MISH_HOST_ROOT</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>true</Value>
+      <Name>MISH_DOCKER</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/var/run/docker.sock</Value>
+      <Name>MISH_DOCKER_SOCKET</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>*</Value>
+      <Name>MISH_ALLOWED_HOSTS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>false</Value>
+      <Name>MISH_TRUST_PROXY</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>MISH_AUTH_TOKEN</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Config Name="WebUI" Target="9543" Default="9543" Mode="tcp" Description="Web UI and API" Type="Port" Display="always" Required="true" Mask="false">9543</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/mish" Mode="rw" Description="Snapshots, schedules and the generated API token" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/mish</Config>
+  <Config Name="Host filesystem" Target="/host/mnt" Default="/mnt" Mode="ro" Description="Read-only host path the scanner may read. Defaults to /mnt so the array, cache and pools are visible; narrow it to one share if you prefer." Type="Path" Display="always" Required="true" Mask="false">/mnt</Config>
+  <Config Name="Docker socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Read-only Docker socket used for container and image usage" Type="Path" Display="always" Required="false" Mask="false">/var/run/docker.sock</Config>
+  <Config Name="API token" Target="MISH_AUTH_TOKEN" Default="" Mode="" Description="Bearer token for the web UI. Leave empty to generate one at first start, then read appdata/mish/auth-token. Or use: openssl rand -hex 32" Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Scan roots" Target="MISH_ROOTS" Default="/host/mnt" Mode="" Description="Comma-separated paths the core may scan. Must be inside /host/mnt." Type="Variable" Display="advanced" Required="false" Mask="false">/host/mnt</Config>
+  <Config Name="Allowed hosts" Target="MISH_ALLOWED_HOSTS" Default="*" Mode="" Description="Host header allow-list. * accepts any host; the API token still applies." Type="Variable" Display="advanced" Required="false" Mask="false">*</Config>
+</Container>
