@@ -2,6 +2,19 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.18.6] - 2026-11-17
+### Deployment
+- **Release workflow publishes images to GHCR.** Pushing a `v*` tag, or running it manually from
+  `main`, builds `ghcr.io/roobyx/mish/server` and `ghcr.io/roobyx/mish/site` for linux/amd64, tags
+  them with the package version plus `latest` and a short SHA, and pushes them so Coolify can pull
+  instead of building on the deployment server.
+- **The server image also ships as `-path`.** `MISH_WEB_BASE` is compiled into the web bundle, so the
+  `/app/`-prefixed variant used behind Coolify's reverse proxy is published under a separate tag
+  rather than replacing the origin-root build.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.18.5 → 1.18.6.
+
 ## [1.18.5] - 2026-11-13
 ### Web
 - **Chart headers survive deep paths.** Breadcrumbs keep the current folder readable, collapse the middle of a long path into an ellipsis, and drop leading crumbs when space runs out.
