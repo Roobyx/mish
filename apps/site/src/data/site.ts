@@ -1,6 +1,7 @@
 export const site = {
   name: "mish",
-  version: "1.20.1",
+  title: "mish — disk space analyzer for Linux servers",
+  version: "1.20.2",
   tagline: "Where did the disk space go?",
   description:
     "Scan a filesystem once, then explore it as an interactive treemap in your browser. Read-only, Docker-aware, JSON-first, and built for servers.",

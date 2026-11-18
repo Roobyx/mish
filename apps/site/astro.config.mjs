@@ -53,6 +53,9 @@ export default defineConfig({
     sitemap(),
     starlight({
       title: "mish",
+      components: {
+        Head: "./src/components/StarlightHead.astro",
+      },
       logo: { src: "./src/assets/logo.svg", alt: "mish" },
       disable404Route: true,
       description:

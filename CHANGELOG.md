@@ -2,6 +2,17 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.20.2] - 2026-11-18
+### Site
+- **The landing title names the category.** `mish — disk space analyzer for Linux servers` replaces
+  the slogan in the `<title>`, and the hero lede leads with "read-only disk space analyzer"; the
+  slogan stays as the `h1`.
+- **Docs pages carry `BreadcrumbList` structured data.** A Starlight `Head` override adds the
+  `mish -> page` trail without dropping any existing head tags.
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.20.1 → 1.20.2; the site, OpenAPI and README version strings were stale at 1.19.0 and now match.
+
 ## [1.20.1] - 2026-11-17
 ### Release
 - **Releases run on push to main.** The Release workflow now triggers on `main` instead of `v*` tags:

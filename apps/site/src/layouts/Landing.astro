@@ -25,7 +25,7 @@ const {
 } = Astro.props;
 
 const base = Astro.site ?? new URL("http://localhost:3300");
-const fullTitle = title ? `${title} | ${site.name}` : `${site.name}: where did the disk space go?`;
+const fullTitle = title ? `${title} | ${site.name}` : site.title;
 const canonical = new URL(Astro.url.pathname, base).href;
 const ogImage = new URL(image, base).href;
 
