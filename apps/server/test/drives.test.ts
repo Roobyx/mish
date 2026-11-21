@@ -18,6 +18,7 @@ function config(): ServerConfig {
     coreSocket: "/run/mish/mish.sock",
     coreBin: undefined,
     version: "0.1.0",
+    docsUrl: "https://docs.example",
   };
 }
 

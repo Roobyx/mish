@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Tile } from "@mish/api-types";
 
-  import { errorMessage, getTree } from "../lib/api.js";
+  import { errorDocs, errorMessage, getTree } from "../lib/api.js";
   import type { ColorMode } from "../lib/color.js";
   import {
     buildImageReport,
@@ -50,7 +50,7 @@
 
   let open = $state(false);
   let busy = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let root = $state<HTMLDivElement | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
 
@@ -91,7 +91,7 @@
       onnotice(`Saved ${fileName}`);
       open = false;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -129,7 +129,7 @@
       onnotice(`Saved ${fileName}`);
       open = false;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -161,7 +161,7 @@
       onnotice(`Saved ${fileName}`);
       open = false;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -185,7 +185,7 @@
       onimport(report);
       onnotice(`Opened ${file.name}`);
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -276,7 +276,12 @@
         <p class="status" role="status">Working…</p>
       {/if}
       {#if error}
-        <p class="status error" role="alert">{error}</p>
+        <p class="status error" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
       {/if}
     </div>
   {/if}

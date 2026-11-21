@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DriveInfo, DriveStats, ScanSummary } from "@mish/api-types";
-  import { createScan, errorMessage } from "../lib/api.js";
+  import { createScan, errorDocs, errorMessage } from "../lib/api.js";
   import { formatAgo, formatBytes, formatCount, percent } from "../lib/format.js";
   import { isSystemMount, mountLabel, orderMounts } from "../lib/mounts.js";
   import { usageColor } from "../lib/color.js";
@@ -13,7 +13,7 @@
     drives: DriveInfo[];
     hostRoot: string;
     warning: string | null;
-    error: string | null;
+    error: unknown;
     loading: boolean;
     onrefresh: () => void;
     onopen: (scanId: string) => void;
@@ -51,7 +51,7 @@
     $props();
 
   let scanning = $state<string | null>(null);
-  let scanError = $state<string | null>(null);
+  let scanError = $state<unknown>(null);
   let tabs = $state<Record<string, CardTab>>({});
 
   function tabOf(key: string): CardTab {
@@ -207,7 +207,7 @@
       const created = await createScan([card.drive.containerPath], { oneFileSystem: true });
       oncreated(created.id);
     } catch (cause) {
-      scanError = errorMessage(cause);
+      scanError = cause;
     } finally {
       scanning = null;
     }
@@ -241,11 +241,21 @@
   {/if}
 
   {#if error}
-    <p class="err" role="alert">{error}</p>
+    <p class="err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {/if}
 
   {#if scanError}
-    <p class="err" role="alert">{scanError}</p>
+    <p class="err" role="alert">
+      {errorMessage(scanError)}
+      {#if errorDocs(scanError)}
+        <a class="error-fix" href={errorDocs(scanError)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {/if}
 
   <ul class="grid">

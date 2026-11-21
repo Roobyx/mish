@@ -5,7 +5,10 @@
  * contract the web client and the docs site build against.
  */
 
-const ok = { "200": { description: "OK" } };
+const ok = {
+  "200": { description: "OK" },
+  default: { $ref: "#/components/responses/Error" },
+};
 const idParam = { name: "id", in: "path", required: true, schema: { type: "string" } };
 const scopeParam = {
   name: "scope",
@@ -29,7 +32,7 @@ export const openApiDocument = {
   openapi: "3.0.3",
   info: {
     title: "mish API",
-    version: "1.20.2",
+    version: "1.21.0",
     description:
       "Read-only disk-space analyzer and indexer. All endpoints are read-only except scan creation, cancellation, snapshot GC and schedules.",
     license: { name: "GPL-3.0-or-later" },
@@ -46,6 +49,32 @@ export const openApiDocument = {
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer" },
+    },
+    schemas: {
+      Error: {
+        type: "object",
+        required: ["error", "message", "docs"],
+        properties: {
+          error: {
+            type: "string",
+            description: "Stable machine-readable code, e.g. forbidden_host.",
+          },
+          message: { type: "string", description: "Human-readable explanation of the failure." },
+          docs: {
+            type: "string",
+            format: "uri",
+            description: "Link to the matching section of the docs site (/errors/#<code>).",
+          },
+        },
+      },
+    },
+    responses: {
+      Error: {
+        description: "Request failed; the body carries a code, a message and a docs link.",
+        content: {
+          "application/json": { schema: { $ref: "#/components/schemas/Error" } },
+        },
+      },
     },
   },
   security: [{ bearerAuth: [] }],
@@ -92,7 +121,10 @@ export const openApiDocument = {
             },
           },
         },
-        responses: { "201": { description: "Created" } },
+        responses: {
+          "201": { description: "Created" },
+          default: { $ref: "#/components/responses/Error" },
+        },
       },
     },
     "/scans/{id}": {
@@ -223,7 +255,10 @@ export const openApiDocument = {
             },
           },
         },
-        responses: { "201": { description: "Created" } },
+        responses: {
+          "201": { description: "Created" },
+          default: { $ref: "#/components/responses/Error" },
+        },
       },
     },
     "/schedules/{id}": {

@@ -4,7 +4,7 @@
   import type { NodeRecord } from "@mish/api-types";
 
   import type { DupGroup } from "../lib/api.js";
-  import { errorMessage, getDuplicates } from "../lib/api.js";
+  import { errorDocs, errorMessage, getDuplicates } from "../lib/api.js";
   import { copyText } from "../lib/clipboard.js";
   import { formatBytes } from "../lib/format.js";
 
@@ -22,7 +22,7 @@
   let mode = $state<Mode>("name+size");
   let groups = $state<DupGroup[]>([]);
   let loading = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let expanded = $state<number | null>(null);
   let copiedId = $state<number | null>(null);
   let seq = 0;
@@ -43,7 +43,7 @@
       expanded = null;
     } catch (cause) {
       if (ticket !== seq) return;
-      error = errorMessage(cause);
+      error = cause;
       groups = [];
     } finally {
       if (ticket === seq) loading = false;
@@ -102,7 +102,12 @@
       <span>Scanning for duplicates…</span>
     </p>
   {:else if error}
-    <p class="state err" role="alert">{error}</p>
+    <p class="state err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {:else if groups.length === 0}
     <p class="state">No duplicate files found in this scope.</p>
   {:else}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NodeKind, NodeRecord } from "@mish/api-types";
 
-  import { errorMessage, searchNodes } from "../lib/api.js";
+  import { errorDocs, errorMessage, searchNodes } from "../lib/api.js";
   import { formatBytes } from "../lib/format.js";
 
   import Spinner from "./Spinner.svelte";
@@ -21,7 +21,7 @@
   let sizeMax = $state<string | number | undefined>("");
   let results = $state<NodeRecord[]>([]);
   let loading = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let searched = $state(false);
 
   function toNumber(value: string | number | undefined): number | undefined {
@@ -51,7 +51,7 @@
         limit: 500,
       });
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
       results = [];
     } finally {
       loading = false;
@@ -101,7 +101,12 @@
   </form>
 
   {#if error}
-    <p class="state err" role="alert">{error}</p>
+    <p class="state err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {:else if loading}
     <p class="state" role="status" aria-label="Searching">
       <Spinner size={16} label="Searching" />

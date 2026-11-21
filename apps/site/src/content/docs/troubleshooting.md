@@ -3,6 +3,9 @@ title: Troubleshooting
 description: Fix an empty Docker view, a port already in use, a failed scan and a missing snapshot.
 ---
 
+Every API error has a stable code, a readable message and a link to the fix. The full list is in
+[Errors](/errors/); this page covers the common symptom-first cases.
+
 ## The Docker view is empty
 
 The Docker socket is not reachable. Check that `docker-socket-proxy` is running and

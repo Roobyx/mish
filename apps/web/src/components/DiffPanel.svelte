@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DiffEntry, DiffResult } from "../lib/api.js";
-  import { errorMessage, getDiff } from "../lib/api.js";
+  import { errorDocs, errorMessage, getDiff } from "../lib/api.js";
   import { formatBytes } from "../lib/format.js";
 
   import Spinner from "./Spinner.svelte";
@@ -32,7 +32,7 @@
   let otherId = $state("");
   let result = $state<DiffResult | null>(null);
   let loading = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let seq = 0;
 
   const candidates = $derived(
@@ -62,7 +62,7 @@
       result = next;
     } catch (cause) {
       if (ticket !== seq) return;
-      error = errorMessage(cause);
+      error = cause;
       result = null;
     } finally {
       if (ticket === seq) loading = false;
@@ -123,7 +123,12 @@
       <span>Comparing…</span>
     </p>
   {:else if error}
-    <p class="state err" role="alert">{error}</p>
+    <p class="state err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {:else if result}
     <dl class="totals">
       <div>

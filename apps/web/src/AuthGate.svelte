@@ -2,11 +2,11 @@
   import { onMount } from "svelte";
 
   import App from "./App.svelte";
-  import { errorMessage, getConfig, isUnauthorized, setToken } from "./lib/api.js";
+  import { errorDocs, errorMessage, getConfig, isUnauthorized, setToken } from "./lib/api.js";
 
   let phase = $state<"checking" | "login" | "ready">("checking");
   let token = $state("");
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let busy = $state(false);
 
   async function probe(): Promise<void> {
@@ -33,7 +33,7 @@
       phase = "ready";
     } catch (cause) {
       setToken("");
-      error = isUnauthorized(cause) ? "That token was rejected." : errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -54,7 +54,12 @@
         <input type="password" bind:value={token} autocomplete="off" spellcheck="false" />
       </label>
       {#if error}
-        <p class="error" role="alert">{error}</p>
+        <p class="error" role="alert">
+          {isUnauthorized(error) ? "That token was rejected." : errorMessage(error)}
+          {#if errorDocs(error)}
+            <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+          {/if}
+        </p>
       {/if}
       <button type="submit" disabled={busy || token.trim().length === 0}>
         {busy ? "Checking…" : "Unlock"}

@@ -25,6 +25,7 @@ services:
       MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
       MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
       MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-false}
+      MISH_DOCS_URL: ${MISH_DOCS_URL:-https://github.com/Roobyx/mish/blob/main/apps/site/src/content/docs/errors.md}
       DOCKER_HOST: tcp://docker-socket-proxy:2375
     volumes:
       - mish-data:/data

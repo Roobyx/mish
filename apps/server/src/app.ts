@@ -8,8 +8,16 @@ import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { streamSSE } from "hono/streaming";
 import type { ServerConfig } from "./config.js";
-import { type CoreApi, CoreRpcError } from "./core/client.js";
+import type { CoreApi } from "./core/client.js";
 import { drivesFromMounts } from "./drives.js";
+import {
+  coreErrorBody,
+  coreErrorResponse,
+  coreMessage,
+  type ErrorCode,
+  type ErrorResponseOptions,
+  errorResponse,
+} from "./errors.js";
 import { openApiDocument } from "./openapi.js";
 import type { Scheduler } from "./scheduler.js";
 
@@ -72,34 +80,16 @@ export function csvEscape(value: unknown): string {
   return `${out}"`;
 }
 
-function coreMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function coreStatus(error: unknown, fallback = 502): number {
-  if (error instanceof CoreRpcError) {
-    switch (error.code) {
-      case -32602:
-        return 400;
-      case -32001:
-        return 404;
-      case -32002:
-        return 409;
-      case -32003:
-        return 422;
-      default:
-        return 502;
-    }
-  }
-  return fallback;
-}
-
 /** Build the Hono application (transport-agnostic; easy to unit test). */
 export function createApp({ config, core, scheduler, startedAt = Date.now() }: AppDeps): Hono {
   const app = new Hono();
-  app.onError((error, c) => {
+  const docsBase = config.docsUrl;
+  const fail = (code: ErrorCode, options?: ErrorResponseOptions): Response =>
+    errorResponse(docsBase, code, options);
+  const coreFail = (error: unknown): Response => coreErrorResponse(docsBase, error);
+  app.onError((error) => {
     console.error(JSON.stringify({ level: "error", msg: coreMessage(error) }));
-    return c.json({ error: "internal_error" }, 500);
+    return fail("internal_error");
   });
   const authToken = config.authToken;
   // Loopback hosts are always allowed so the container healthcheck and local
@@ -122,12 +112,6 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     new URL(c.req.url).host;
   const rateBuckets = new Map<string, { count: number; reset: number }>();
   let activeSse = 0;
-
-  const coreError = (message: string, status = 502) =>
-    new Response(JSON.stringify({ error: message }), {
-      status,
-      headers: { "content-type": "application/json" },
-    });
 
   const readJson = async <T>(c: Context): Promise<T | null> => {
     try {
@@ -169,14 +153,19 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
   app.use("/api/v1/*", async (c, next) => {
     const host = hostnameOf(requestHost(c));
     if (!host || !hostAllowed(host)) {
-      return c.json({ error: "forbidden_host" }, 403);
+      return fail("forbidden_host", {
+        message: host
+          ? `The Host header "${host}" is not in the allowed list. Add ${host} to MISH_ALLOWED_HOSTS, or use * behind a proxy that rewrites Host.`
+          : "The request has no valid Host header.",
+        extra: { host },
+      });
     }
 
     const method = c.req.method;
     if (method !== "GET" && method !== "HEAD") {
       const site = c.req.header("sec-fetch-site");
       if (site && site !== "same-origin" && site !== "none") {
-        return c.json({ error: "cross_site_request" }, 403);
+        return fail("cross_site_request");
       }
       const origin = c.req.header("origin");
       if (origin) {
@@ -184,7 +173,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         try {
           originHost = new URL(origin).host.toLowerCase();
         } catch {
-          return c.json({ error: "invalid_origin" }, 403);
+          return fail("invalid_origin");
         }
         const expected = hostnameOf(requestHost(c));
         const originHostname = hostnameOf(originHost);
@@ -192,13 +181,15 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         // accept an Origin that matches a configured allowed host.
         if (!expected || originHostname !== expected) {
           if (!(trustProxy && originHostname && hostAllowed(originHostname))) {
-            return c.json({ error: "cross_origin_request" }, 403);
+            return fail("cross_origin_request", {
+              message: `The Origin host "${originHostname || origin}" does not match the request Host "${expected || "(missing)"}". Open the UI on the same hostname or allow it in MISH_ALLOWED_HOSTS.`,
+            });
           }
         }
       }
       const contentType = (c.req.header("content-type") ?? "").toLowerCase();
       if (!contentType.startsWith("application/json")) {
-        return c.json({ error: "unsupported_media_type" }, 415);
+        return fail("unsupported_media_type");
       }
     }
 
@@ -206,9 +197,8 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       const header = c.req.header("authorization") ?? "";
       const [scheme, ...rest] = header.split(" ");
       if (scheme?.toLowerCase() !== "bearer" || !safeEqual(rest.join(" "), authToken)) {
-        return new Response(JSON.stringify({ error: "unauthorized" }), {
-          status: 401,
-          headers: { "content-type": "application/json", "www-authenticate": "Bearer" },
+        return fail("unauthorized", {
+          headers: { "www-authenticate": "Bearer" },
         });
       }
     }
@@ -225,7 +215,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     } else {
       bucket.count += 1;
       if (bucket.count > RATE_MAX) {
-        return c.json({ error: "rate_limited" }, 429);
+        return fail("rate_limited");
       }
     }
     if (rateBuckets.size > 1024) {
@@ -240,16 +230,16 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     "/api/v1/*",
     bodyLimit({
       maxSize: maxBody,
-      onError: (c) => c.json({ error: "payload_too_large" }, 413),
+      onError: () => fail("payload_too_large"),
     }),
   );
   app.use("/api/v1/*", async (c, next) => {
     await next();
     c.header("cache-control", "no-store");
   });
-  app.use("/api/v1/docker/*", async (c, next) => {
+  app.use("/api/v1/docker/*", async (_c, next) => {
     if (!config.dockerEnabled) {
-      return c.json({ error: "docker_disabled" }, 404);
+      return fail("docker_disabled");
     }
     await next();
   });
@@ -289,7 +279,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("host.mounts"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -313,26 +303,26 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
   app.get("/api/v1/schedules", (c) => c.json({ schedules: scheduler?.list() ?? [] }));
 
   app.post("/api/v1/schedules", async (c) => {
-    if (!scheduler) return coreError("scheduler unavailable", 503);
+    if (!scheduler) return fail("scheduler_unavailable");
     const body = await readJson<{ roots?: unknown; cron?: unknown; enabled?: unknown }>(c);
-    if (!body) return c.json({ error: "invalid_json" }, 400);
+    if (!body) return fail("invalid_json");
     if (
       !Array.isArray(body.roots) ||
       body.roots.length === 0 ||
       body.roots.length > MAX_ROOTS ||
       body.roots.some((root) => typeof root !== "string" || root.length === 0 || root.length > 4096)
     ) {
-      return c.json({ error: "roots must be 1..32 non-empty strings" }, 400);
+      return fail("invalid_roots");
     }
     if (
       typeof body.cron !== "string" ||
       body.cron.trim().length === 0 ||
       body.cron.length > MAX_CRON_LEN
     ) {
-      return c.json({ error: "invalid cron expression" }, 400);
+      return fail("invalid_cron");
     }
     if (body.enabled !== undefined && typeof body.enabled !== "boolean") {
-      return c.json({ error: "enabled must be a boolean" }, 400);
+      return fail("invalid_enabled");
     }
     return c.json(
       scheduler.add({
@@ -345,7 +335,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
   });
 
   app.delete("/api/v1/schedules/:id", (c) => {
-    if (!scheduler) return coreError("scheduler unavailable", 503);
+    if (!scheduler) return fail("scheduler_unavailable");
     return c.json({ deleted: scheduler.remove(c.req.param("id")) });
   });
 
@@ -354,25 +344,25 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("scans.list"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
   app.post("/api/v1/scans", async (c) => {
     const body = await readJson<{ roots?: unknown; options?: unknown }>(c);
-    if (!body) return c.json({ error: "invalid_json" }, 400);
+    if (!body) return fail("invalid_json");
     if (
       !Array.isArray(body.roots) ||
       body.roots.length === 0 ||
       body.roots.length > MAX_ROOTS ||
       body.roots.some((root) => typeof root !== "string" || root.length === 0 || root.length > 4096)
     ) {
-      return c.json({ error: "roots must be 1..32 non-empty strings" }, 400);
+      return fail("invalid_roots");
     }
     try {
       return c.json(await core.call("scans.create", body), 201);
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -380,7 +370,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("scans.get", { id: c.req.param("id") }));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error, 404));
+      return coreFail(error);
     }
   });
 
@@ -388,7 +378,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("scans.delete", { id: c.req.param("id") }));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -396,7 +386,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("scans.cancel", { id: c.req.param("id") }));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -404,7 +394,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("scans.get", { id: c.req.param("id") }));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error, 404));
+      return coreFail(error);
     }
   });
 
@@ -415,11 +405,11 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       try {
         return c.json(await core.call("scans.progress", { id }));
       } catch (error) {
-        return coreError(coreMessage(error), coreStatus(error, 404));
+        return coreFail(error);
       }
     }
     if (activeSse >= maxSse) {
-      return c.json({ error: "too_many_streams" }, 503);
+      return fail("too_many_streams");
     }
     activeSse += 1;
     const deadline = Date.now() + 30 * 60_000;
@@ -434,7 +424,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
             } catch (error) {
               await stream.writeSSE({
                 event: "error",
-                data: JSON.stringify({ error: coreMessage(error) }),
+                data: JSON.stringify(coreErrorBody(docsBase, error)),
               });
               break;
             }
@@ -463,7 +453,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -479,7 +469,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -495,7 +485,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -515,7 +505,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       }));
       return c.json({ items });
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -529,7 +519,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -542,7 +532,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -556,7 +546,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -570,7 +560,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -585,7 +575,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -593,7 +583,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       const format = c.req.query("format") ?? "json";
       if (format !== "csv" && format !== "json") {
-        return c.json({ error: "format must be csv or json" }, 400);
+        return fail("invalid_export_format");
       }
       const scope = clampInt(c.req.query("scope"), 0, 0, MAX_SCOPE);
       const result = await core.call<{ items: Array<Record<string, unknown>> }>("query.search", {
@@ -628,7 +618,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       }
       return c.json({ snapshot: c.req.param("id"), nodes: items });
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -651,7 +641,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -666,7 +656,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -679,21 +669,21 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
   app.post("/api/v1/gc", async (c) => {
     const body = await readJson<{ keep?: unknown }>(c);
-    if (!body) return c.json({ error: "invalid_json" }, 400);
+    if (!body) return fail("invalid_json");
     if (body.keep !== undefined && (typeof body.keep !== "number" || !Number.isFinite(body.keep))) {
-      return c.json({ error: "keep must be a number" }, 400);
+      return fail("invalid_keep");
     }
     try {
       const keep = clampInt(body.keep as number | undefined, 3, 0, 1000);
       return c.json(await core.call("snapshots.gc", { keep }));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -702,7 +692,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("docker.status"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -711,7 +701,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       const scan = c.req.query("scan");
       return c.json(await core.call("docker.containers", scan ? { scan } : undefined));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -723,7 +713,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       }
       return c.json(await core.call("docker.mounts"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -731,7 +721,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("docker.images"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -739,7 +729,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("docker.volumes"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -747,7 +737,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("docker.locate", { query: c.req.query("q") ?? "" }));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -756,7 +746,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
       const scan = c.req.query("scan");
       const container = c.req.query("container");
       if (!scan || !container) {
-        return c.json({ error: "scan and container are required" }, 400);
+        return fail("invalid_docker_overlay_request");
       }
       return c.json(
         await core.call("docker.overlayContents", {
@@ -766,7 +756,7 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
         }),
       );
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
@@ -774,11 +764,11 @@ export function createApp({ config, core, scheduler, startedAt = Date.now() }: A
     try {
       return c.json(await core.call("docker.stats"));
     } catch (error) {
-      return coreError(coreMessage(error), coreStatus(error));
+      return coreFail(error);
     }
   });
 
-  app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
+  app.notFound((c) => fail("not_found", { extra: { path: c.req.path } }));
 
   return app;
 }

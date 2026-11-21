@@ -9,6 +9,7 @@
   import { onMount } from "svelte";
 
   import {
+    errorDocs,
     errorMessage,
     getDockerContainers,
     getDockerImages,
@@ -32,7 +33,7 @@
   let images = $state<ImageInfo[]>([]);
   let volumes = $state<VolumeInfo[]>([]);
   let loading = $state(true);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let timer: ReturnType<typeof setInterval> | null = null;
   let statsById = $state<Map<string, DockerStats>>(new Map());
   let locateQuery = $state("");
@@ -66,7 +67,7 @@
     try {
       locateMatches = await getDockerLocate(query);
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       locating = false;
     }
@@ -108,7 +109,7 @@
         onreveal?.(result.nodeId);
       }
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     }
   }
 
@@ -125,7 +126,7 @@
       images = nextImages;
       volumes = nextVolumes;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       loading = false;
     }
@@ -202,7 +203,12 @@
   {/if}
 
   {#if error}
-    <p class="state err" role="alert">{error}</p>
+    <p class="state err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {:else if loading && isEmpty}
     <p class="state" role="status" aria-label="Loading Docker">
       <Spinner size={16} label="Loading Docker" />

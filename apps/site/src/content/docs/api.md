@@ -11,6 +11,9 @@ When `MISH_AUTH_TOKEN` is set, send `Authorization: Bearer <token>` on every end
 delete application snapshots; protect the API accordingly. Docker endpoints return 404 when
 `MISH_DOCKER=false`.
 
+Failures return `{ "error": "<code>", "message": "<what happened>", "docs": "<link>" }`. The code is
+stable, the message names the offending value, and the docs link points at [Errors](/errors/).
+
 ## Core
 
 ```

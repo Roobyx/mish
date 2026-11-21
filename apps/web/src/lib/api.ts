@@ -25,10 +25,33 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Stable server code, e.g. `forbidden_host`. */
+    readonly code?: string,
+    /** Link to the docs section that explains the failure. */
+    readonly docs?: string,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+async function toApiError(res: Response): Promise<ApiError> {
+  let message = `HTTP ${res.status} ${res.statusText}`.trim();
+  let code: string | undefined;
+  let docs: string | undefined;
+  try {
+    const body: unknown = await res.json();
+    if (body && typeof body === "object") {
+      const record = body as Record<string, unknown>;
+      const detail = record.message ?? record.error;
+      if (typeof detail === "string" && detail.length > 0) message = detail;
+      if (typeof record.error === "string") code = record.error;
+      if (typeof record.docs === "string") docs = record.docs;
+    }
+  } catch {
+    // Non-JSON error body: keep the HTTP status message.
+  }
+  return new ApiError(res.status, message, code, docs);
 }
 
 /** Bearer token kept for this tab only; never written to a URL. */
@@ -62,6 +85,11 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Docs link attached by the server, when there is one. */
+export function errorDocs(error: unknown): string | undefined {
+  return error instanceof ApiError ? error.docs : undefined;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("accept", "application/json");
@@ -69,18 +97,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (token) headers.set("authorization", `Bearer ${token}`);
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
-    let message = `HTTP ${res.status} ${res.statusText}`.trim();
-    try {
-      const body: unknown = await res.json();
-      if (body && typeof body === "object") {
-        const record = body as Record<string, unknown>;
-        const detail = record["error"] ?? record["message"];
-        if (typeof detail === "string" && detail.length > 0) message = detail;
-      }
-    } catch {
-      // Non-JSON error body: keep the HTTP status message.
-    }
-    throw new ApiError(res.status, message);
+    throw await toApiError(res);
   }
   if (res.status === 204) {
     return undefined as unknown as T;
@@ -316,14 +333,7 @@ export async function downloadExport(
     headers,
   });
   if (!res.ok) {
-    let message = `HTTP ${res.status} ${res.statusText}`.trim();
-    try {
-      const body = (await res.json()) as { error?: unknown };
-      if (typeof body.error === "string") message = body.error;
-    } catch {
-      // Keep the status message for non-JSON errors.
-    }
-    throw new ApiError(res.status, message);
+    throw await toApiError(res);
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
 
   import type { HostMount } from "@mish/api-types";
-  import { createScan, errorMessage, getConfig, getHostMounts } from "../lib/api.js";
+  import { createScan, errorDocs, errorMessage, getConfig, getHostMounts } from "../lib/api.js";
   import { isSystemMount, mountLabel, orderMounts } from "../lib/mounts.js";
 
   import Icon from "./Icon.svelte";
@@ -19,7 +19,7 @@
   let hostRoot = $state("/host");
   let excludeText = $state("");
   let crossFs = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let busy = $state(false);
 
   const orderedMounts = $derived(orderMounts(mounts));
@@ -69,7 +69,7 @@
       const created = await createScan(roots, { oneFileSystem: !crossFs, exclusions });
       oncreated(created.id);
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -167,7 +167,12 @@
   {/if}
 
   {#if error}
-    <p class="error" role="alert">{error}</p>
+    <p class="error" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {/if}
 </section>
 

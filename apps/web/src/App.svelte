@@ -40,6 +40,7 @@
 import Sunburst from "./components/Sunburst.svelte";
 import Treemap from "./components/Treemap.svelte";
   import {
+    errorDocs,
     errorMessage,
     getChildren,
     getDrives,
@@ -260,14 +261,14 @@ import Treemap from "./components/Treemap.svelte";
   let pendingScope: number | null = initial.scope;
 
   let health = $state<HealthResponse | null>(null);
-  let healthError = $state<string | null>(null);
+  let healthError = $state<unknown>(null);
   let scans = $state<ScanSummary[]>([]);
   let selectedId = $state<string | null>(null);
 
   let drives = $state<DriveInfo[]>([]);
   let drivesHostRoot = $state("/host");
   let drivesWarning = $state<string | null>(null);
-  let drivesError = $state<string | null>(null);
+  let drivesError = $state<unknown>(null);
   let drivesLoading = $state(false);
 
   let scopePath = $state<Crumb[]>([]);
@@ -283,7 +284,7 @@ import Treemap from "./components/Treemap.svelte";
   let tileBusy = $state(false);
   let childBusy = $state(false);
   let swhitching = $state(true);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
 
   let tree = $state<HierarchyNode | null>(null);
   let topNodes = $state<NodeRecord[]>([]);
@@ -292,7 +293,7 @@ import Treemap from "./components/Treemap.svelte";
   let extGroup = $state<string | null>(null);
   let heatmapData = $state<HeatmapResponse | null>(null);
   let viewLoading = $state(false);
-  let viewError = $state<string | null>(null);
+  let viewError = $state<unknown>(null);
 
   let searchOpen = $state(initial.q.length > 0);
   let searchQuery = $state(initial.q);
@@ -575,7 +576,7 @@ import Treemap from "./components/Treemap.svelte";
     try {
       scans = await listScans();
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     }
   }
 
@@ -588,7 +589,7 @@ import Treemap from "./components/Treemap.svelte";
       drivesHostRoot = response.hostRoot;
       drivesWarning = response.warning ?? null;
     } catch (cause) {
-      drivesError = errorMessage(cause);
+      drivesError = cause;
     } finally {
       drivesLoading = false;
     }
@@ -608,7 +609,7 @@ import Treemap from "./components/Treemap.svelte";
       try {
         summary = await getScan(id);
       } catch (cause) {
-        error = errorMessage(cause);
+        error = cause;
       }
     }
     if (seq !== scanSeq) return;
@@ -695,7 +696,7 @@ import Treemap from "./components/Treemap.svelte";
       }
     } catch (cause) {
       if (seq !== tilesSeq) return;
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       if (seq !== tilesSeq) return;
       loading = false;
@@ -713,7 +714,7 @@ import Treemap from "./components/Treemap.svelte";
       childTotal = response.total;
     } catch (cause) {
       if (seq !== childrenSeq) return;
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       if (seq === childrenSeq) childBusy = false;
     }
@@ -757,7 +758,7 @@ import Treemap from "./components/Treemap.svelte";
       }
     } catch (cause) {
       if (seq !== viewSeq) return;
-      viewError = errorMessage(cause);
+      viewError = cause;
     } finally {
       if (seq === viewSeq) viewLoading = false;
     }
@@ -778,7 +779,7 @@ import Treemap from "./components/Treemap.svelte";
       if (response.total === 0) return;
       pushScope(tile.node, tile.name);
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       tileBusy = false;
     }
@@ -804,7 +805,7 @@ import Treemap from "./components/Treemap.svelte";
       if (response.total === 0) return;
       pushScope(node.id, node.name);
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       tileBusy = false;
     }
@@ -865,7 +866,7 @@ import Treemap from "./components/Treemap.svelte";
       try {
         health = await getHealth();
       } catch (cause) {
-        healthError = errorMessage(cause);
+        healthError = cause;
       }
       try {
         void loadDrives();
@@ -881,7 +882,7 @@ import Treemap from "./components/Treemap.svelte";
         // nothing left to wait for.
         if (view !== "treemap" || !newest) endSwitch();
       } catch (cause) {
-        error = errorMessage(cause);
+        error = cause;
         endSwitch();
       }
     })();
@@ -948,6 +949,15 @@ import Treemap from "./components/Treemap.svelte";
     if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
   });
 </script>
+
+{#snippet errorLine(value: unknown)}
+  <p class="state err" role="alert">
+    {errorMessage(value)}
+    {#if errorDocs(value)}
+      <a class="error-fix" href={errorDocs(value)} target="_blank" rel="noreferrer">How to fix</a>
+    {/if}
+  </p>
+{/snippet}
 
 <div class="shell">
   <aside class="sidebar" class:open={sidebarOpen}>
@@ -1331,7 +1341,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading tiles…</span>
                   </p>
                 {:else if error}
-                  <p class="state err">{error}</p>
+                  {@render errorLine(error)}
                 {:else if tiles.length === 0}
                   <p class="state">No tiles in {scopeLabel}.</p>
                 {:else}
@@ -1344,7 +1354,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading hierarchy…</span>
                   </p>
                 {:else if viewError}
-                  <p class="state err">{viewError}</p>
+                  {@render errorLine(viewError)}
                 {:else if tree}
                   {#if (tree.children ?? []).length > 0}
                     {#if view === "sunburst"}
@@ -1367,7 +1377,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading nodes…</span>
                   </p>
                 {:else if viewError}
-                  <p class="state err">{viewError}</p>
+                  {@render errorLine(viewError)}
                 {:else if topNodes.length === 0}
                   <p class="state">No nodes in {scopeLabel}.</p>
                 {:else}
@@ -1380,7 +1390,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading heatmap…</span>
                   </p>
                 {:else if viewError}
-                  <p class="state err">{viewError}</p>
+                  {@render errorLine(viewError)}
                 {:else if heatmapData}
                   <Heatmap heatmap={heatmapData} />
                 {:else}
@@ -1393,7 +1403,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading histogram…</span>
                   </p>
                 {:else if viewError}
-                  <p class="state err">{viewError}</p>
+                  {@render errorLine(viewError)}
                 {:else if histogram.length === 0}
                   <p class="state">No data in {scopeLabel}.</p>
                 {:else}
@@ -1406,7 +1416,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading breakdown…</span>
                   </p>
                 {:else if viewError}
-                  <p class="state err">{viewError}</p>
+                  {@render errorLine(viewError)}
                 {:else if histogram.length === 0}
                   <p class="state">No data in {scopeLabel}.</p>
                 {:else}
@@ -1428,7 +1438,7 @@ import Treemap from "./components/Treemap.svelte";
                     <span>Loading breakdown…</span>
                   </p>
                 {:else if viewError}
-                  <p class="state err">{viewError}</p>
+                  {@render errorLine(viewError)}
                 {:else if histogram.length === 0}
                   <p class="state">No data in {scopeLabel}.</p>
                 {:else}
@@ -2192,6 +2202,12 @@ import Treemap from "./components/Treemap.svelte";
 
   .state.err {
     color: var(--err);
+  }
+
+  .error-fix {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .side-tree-panel {

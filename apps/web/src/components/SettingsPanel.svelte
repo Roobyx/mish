@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { DriveInfo, HealthResponse, ScanSummary } from "@mish/api-types";
 
-  import { deleteScan, downloadExport, errorMessage, runGc } from "../lib/api.js";
+  import { deleteScan, downloadExport, errorDocs, errorMessage, runGc } from "../lib/api.js";
   import { formatAgo, formatBytes } from "../lib/format.js";
   import { scanRootLabel } from "../lib/mounts.js";
   import { stateMeta } from "../lib/scan-state.js";
@@ -17,7 +17,7 @@
     selectedId: string | null;
     drives: DriveInfo[];
     health: HealthResponse | null;
-    healthError: string | null;
+    healthError: unknown;
     theme: ThemeId;
     ontheme: (id: ThemeId) => void;
     layout: LayoutId;
@@ -42,7 +42,7 @@
 
   let checked = $state<Set<string>>(new Set());
   let busy = $state(false);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
   let notice = $state<string | null>(null);
   let confirm = $state<"delete" | "gc" | null>(null);
 
@@ -71,7 +71,7 @@
       await downloadExport(scan.id, "csv");
       notice = `Exported ${scanRootLabel(scan, drives)} as CSV`;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     }
   }
 
@@ -94,7 +94,7 @@
       await onchanged();
       notice = `Deleted ${targets.length} snapshot${targets.length === 1 ? "" : "s"}.`;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
       confirm = null;
@@ -114,7 +114,7 @@
         result.removed.length === 1 ? "" : "s"
       }.`;
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
       confirm = null;
@@ -173,7 +173,10 @@
         </div>
         <p class="status-detail">
           {#if healthError}
-            {healthError}
+            {errorMessage(healthError)}
+            {#if errorDocs(healthError)}
+              <a class="error-fix" href={errorDocs(healthError)} target="_blank" rel="noreferrer">How to fix</a>
+            {/if}
           {:else if health}
             protocol v{health.protocol} · uptime {formatUptime(health.uptimeS)}
           {:else}
@@ -317,7 +320,12 @@
         <p class="notice" role="status">{notice}</p>
       {/if}
       {#if error}
-        <p class="error" role="alert">{error}</p>
+        <p class="error" role="alert">
+        {errorMessage(error)}
+        {#if errorDocs(error)}
+          <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+        {/if}
+      </p>
       {/if}
 
       {#if scans.length === 0}

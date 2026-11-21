@@ -5,8 +5,9 @@ import { join } from "node:path";
 
 import { createApp, csvEscape } from "../src/app.js";
 import type { ServerConfig } from "../src/config.js";
-import { ensureAuthToken } from "../src/config.js";
-import type { CoreApi, CoreStatus } from "../src/core/client.js";
+import { ensureAuthToken, readConfig } from "../src/config.js";
+import { type CoreApi, CoreRpcError, type CoreStatus } from "../src/core/client.js";
+import { ERROR_CODES } from "../src/errors.js";
 
 function config(): ServerConfig {
   return {
@@ -20,6 +21,7 @@ function config(): ServerConfig {
     coreSocket: "/run/mish/mish.sock",
     coreBin: undefined,
     version: "0.1.0",
+    docsUrl: "https://docs.example",
   };
 }
 
@@ -76,8 +78,10 @@ describe("server API", () => {
     const app = createApp({ config: config(), core });
     const res = await app.request("/nope");
     expect(res.status).toBe(404);
-    const body = (await res.json()) as { error: string };
+    const body = (await res.json()) as { error: string; message: string; docs: string };
     expect(body.error).toBe("not_found");
+    expect(body.message.length).toBeGreaterThan(0);
+    expect(body.docs).toBe("https://docs.example/errors/#not_found");
   });
 
   test("requires a bearer token when configured", async () => {
@@ -155,6 +159,117 @@ describe("server API", () => {
       headers: { host: "casaos.local:9543" },
     });
     expect(allowed.status).toBe(200);
+  });
+
+  test("forbidden host names the rejected host and links the docs", async () => {
+    const core = new StubCore(() => ({}));
+    const app = createApp({ config: { ...config(), allowedHosts: [] }, core });
+    const res = await app.request("/api/v1/scans", {
+      headers: { host: "mish.lan:9543" },
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as {
+      error: string;
+      message: string;
+      docs: string;
+      host: string;
+    };
+    expect(body.error).toBe("forbidden_host");
+    expect(body.host).toBe("mish.lan");
+    expect(body.message).toContain("mish.lan");
+    expect(body.message).toContain("MISH_ALLOWED_HOSTS");
+    expect(body.docs).toBe("https://docs.example/errors/#forbidden_host");
+  });
+
+  test("normalizes a trailing slash in the docs base URL", async () => {
+    const core = new StubCore(() => ({}));
+    const app = createApp({ config: { ...config(), docsUrl: "https://docs.example/" }, core });
+    const res = await app.request("/api/v1/scans", { headers: { host: "nope.example" } });
+    const body = (await res.json()) as { docs: string };
+    expect(body.docs).toBe("https://docs.example/errors/#forbidden_host");
+  });
+
+  test("links a direct docs page with an anchor", async () => {
+    const core = new StubCore(() => ({}));
+    const app = createApp({
+      config: { ...config(), docsUrl: "https://example.com/errors.md" },
+      core,
+    });
+    const res = await app.request("/api/v1/scans", { headers: { host: "nope.example" } });
+    const body = (await res.json()) as { docs: string };
+    expect(body.docs).toBe("https://example.com/errors.md#forbidden_host");
+  });
+
+  test("the default docs link points at the GitHub errors page", async () => {
+    const core = new StubCore(() => ({}));
+    const app = createApp({ config: readConfig({}), core });
+    const res = await app.request("/api/v1/scans", { headers: { host: "nope.example" } });
+    const body = (await res.json()) as { docs: string };
+    expect(body.docs).toBe(
+      "https://github.com/Roobyx/mish/blob/main/apps/site/src/content/docs/errors.md#forbidden_host",
+    );
+  });
+
+  test("maps core RPC errors to stable codes with docs links", async () => {
+    const core = new StubCore(() => {
+      throw new CoreRpcError(-32602, "root '/etc' is outside the configured MISH_ROOTS");
+    });
+    const app = createApp({ config: config(), core });
+    const res = await app.request("/api/v1/scans", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ roots: ["/etc"] }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string; docs: string };
+    expect(body.error).toBe("invalid_params");
+    expect(body.message).toContain("MISH_ROOTS");
+    expect(body.docs).toBe("https://docs.example/errors/#invalid_params");
+  });
+
+  test("reports an unreachable core as core_unavailable", async () => {
+    const core = new StubCore(() => {
+      throw new Error("core connection closed");
+    });
+    const app = createApp({ config: config(), core });
+    const res = await app.request("/api/v1/scans");
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string; docs: string };
+    expect(body.error).toBe("core_unavailable");
+    expect(body.docs).toBe("https://docs.example/errors/#core_unavailable");
+  });
+
+  test("invalid roots use a stable code", async () => {
+    const core = new StubCore(() => ({}));
+    const app = createApp({ config: config(), core });
+    const res = await app.request("/api/v1/scans", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ roots: [] }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("invalid_roots");
+    expect(body.message).toContain("roots must be");
+  });
+
+  test("readConfig defaults the docs URL and accepts an override", () => {
+    expect(readConfig({}).docsUrl).toBe(
+      "https://github.com/Roobyx/mish/blob/main/apps/site/src/content/docs/errors.md",
+    );
+    expect(readConfig({ MISH_DOCS_URL: " https://mish.example/docs " }).docsUrl).toBe(
+      "https://mish.example/docs",
+    );
+  });
+
+  test("every error code has a docs section", () => {
+    const docs = readFileSync(
+      new URL("../../site/src/content/docs/errors.md", import.meta.url),
+      "utf8",
+    );
+    for (const code of ERROR_CODES) {
+      expect(docs).toContain(`### ${code}`);
+    }
   });
 
   test("clamps export limits", async () => {

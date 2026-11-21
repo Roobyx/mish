@@ -307,10 +307,23 @@ fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
+            let docs_base = std::env::var("MISH_DOCS_URL").unwrap_or_else(|_| {
+                "https://github.com/Roobyx/mish/blob/main/apps/site/src/content/docs/errors.md"
+                    .to_string()
+            });
+            let docs = if docs_base.ends_with(".md") {
+                format!("{docs_base}#cli")
+            } else {
+                format!("{}/errors/#cli", docs_base.trim_end_matches('/'))
+            };
             if json {
-                println!("{}", json!({ "ok": false, "error": err.to_string() }));
+                println!(
+                    "{}",
+                    json!({ "ok": false, "error": err.to_string(), "docs": docs })
+                );
             } else {
                 eprintln!("error: {err}");
+                eprintln!("docs: {docs}");
             }
             ExitCode::FAILURE
         }

@@ -97,7 +97,7 @@ export default defineConfig({
         },
         {
           label: "Reference",
-          items: ["architecture", "configuration", "security", "troubleshooting"],
+          items: ["architecture", "configuration", "security", "errors", "troubleshooting"],
         },
       ],
     }),

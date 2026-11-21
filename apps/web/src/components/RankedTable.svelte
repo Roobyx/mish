@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NodeRecord } from "@mish/api-types";
 
-  import { errorMessage, getChildren } from "../lib/api.js";
+  import { errorDocs, errorMessage, getChildren } from "../lib/api.js";
   import { colorForExtension, extensionOf } from "../lib/color.js";
   import { formatBytes } from "../lib/format.js";
 
@@ -50,7 +50,7 @@
   let loads = $state<Load[]>([]);
   let expanded = $state<number[]>([]);
   let busing = $state<number[]>([]);
-  let error = $state<string | null>(null);
+  let error = $state<unknown>(null);
 
   let wrap = $state<HTMLDivElement | null>(null);
   let scrollTop = $state(0);
@@ -91,7 +91,7 @@
       const response = await getChildren(id, nodeId, { sort: "size", limit: 1000 });
       loads = [...loads, { id: nodeId, items: response.items }];
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busing = busing.filter((entry) => entry !== nodeId);
     }
@@ -335,7 +335,12 @@
     </tbody>
   </table>
   {#if error}
-    <p class="empty err" role="alert">{error}</p>
+    <p class="empty err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {/if}
   {#if !hasRoot}
     <p class="empty">Select a snapshot to see its tree.</p>

@@ -23,6 +23,8 @@ export interface ServerConfig {
   maxSseConnections?: number;
   /** Maximum JSON request body size. */
   maxBodyBytes?: number;
+  /** Docs base or page URL used for the `docs` field of error responses. */
+  docsUrl: string;
 }
 
 function readPackageVersion(): string {
@@ -89,6 +91,9 @@ export function readConfig(env: EnvLike = process.env): ServerConfig {
     trustProxy: ["1", "true", "yes", "on"].includes((env.MISH_TRUST_PROXY ?? "").toLowerCase()),
     maxSseConnections: positiveInt(env.MISH_MAX_SSE, 32),
     maxBodyBytes: positiveInt(env.MISH_MAX_BODY_BYTES, 1_048_576),
+    docsUrl:
+      (env.MISH_DOCS_URL ?? "").trim() ||
+      "https://github.com/Roobyx/mish/blob/main/apps/site/src/content/docs/errors.md",
   };
 }
 

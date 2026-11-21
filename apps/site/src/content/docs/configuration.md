@@ -5,8 +5,8 @@ description: Every environment variable, port, mount and scan option, with its d
 
 ## Environment variables
 
-| Variable                  | Default                                  | Purpose                                                                       |
-| ------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| Variable              | Default                                  | Purpose                                                                       |
+| --------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
 | `MISH_DATA_DIR`       | `./data`                                 | Catalog, snapshots and journal                                                |
 | `MISH_BIND`           | `127.0.0.1:9543`                         | Server bind address; non-loopback requires a token                            |
 | `MISH_AUTH_TOKEN`     | —                                        | Bearer token required by the API (required for non-loopback binds)            |
@@ -14,13 +14,14 @@ description: Every environment variable, port, mount and scan option, with its d
 | `MISH_TRUST_PROXY`    | `false`                                  | Trust `X-Forwarded-Host`/`X-Forwarded-For` from a reverse proxy               |
 | `MISH_MAX_SSE`        | `32`                                     | Maximum concurrent SSE progress streams                                       |
 | `MISH_MAX_BODY_BYTES` | `1048576`                                | Maximum JSON request body                                                     |
-| `MISH_CORE_SOCKET`    | `/tmp/mish.sock`                     | Unix socket for the core daemon                                               |
-| `MISH_CORE_BIN`       | —                                        | Path to the `mish` binary the server supervises                           |
+| `MISH_DOCS_URL`       | GitHub errors page                       | Docs base or page URL used for the `docs` link in errors (`/errors/#<code>`)  |
+| `MISH_CORE_SOCKET`    | `/tmp/mish.sock`                         | Unix socket for the core daemon                                               |
+| `MISH_CORE_BIN`       | —                                        | Path to the `mish` binary the server supervises                               |
 | `MISH_ROOTS`          | —                                        | Canonical allowlist of scannable roots (comma-separated); empty rejects scans |
 | `MISH_DOCKER`         | `false`                                  | Enable Docker integration (also gates the core collector)                     |
 | `MISH_WEB_DIR`        | —                                        | Directory of built SPA assets to serve                                        |
 | `MISH_DOCKER_SOCKET`  | `$DOCKER_HOST` or `/var/run/docker.sock` | Docker endpoint (`unix://`, `tcp://`)                                         |
-| `DOCKER_HOST`             | —                                        | Docker endpoint used when `MISH_DOCKER_SOCKET` is unset                   |
+| `DOCKER_HOST`         | —                                        | Docker endpoint used when `MISH_DOCKER_SOCKET` is unset                       |
 
 Compose also reads `MISH_PUBLISH_ADDR` (default `127.0.0.1`), `MISH_PORT` and
 `MISH_SITE_PORT`.

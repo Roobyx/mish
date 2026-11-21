@@ -2,14 +2,14 @@
   import { onMount } from "svelte";
 
   import type { Schedule } from "../lib/api.js";
-  import { createSchedule, deleteSchedule, errorMessage, getSchedules } from "../lib/api.js";
+  import { createSchedule, deleteSchedule, errorDocs, errorMessage, getSchedules } from "../lib/api.js";
 
   import Spinner from "./Spinner.svelte";
 
   let schedules = $state<Schedule[]>([]);
   let loading = $state(true);
-  let error = $state<string | null>(null);
-  let formError = $state<string | null>(null);
+  let error = $state<unknown>(null);
+  let formError = $state<unknown>(null);
   let busy = $state(false);
 
   let rootsInput = $state("/host");
@@ -40,7 +40,7 @@
     try {
       schedules = await getSchedules();
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       loading = false;
     }
@@ -70,7 +70,7 @@
       cronInput = "";
       await refresh();
     } catch (cause) {
-      formError = errorMessage(cause);
+      formError = cause;
     } finally {
       busy = false;
     }
@@ -83,7 +83,7 @@
       await deleteSchedule(id);
       await refresh();
     } catch (cause) {
-      error = errorMessage(cause);
+      error = cause;
     } finally {
       busy = false;
     }
@@ -124,7 +124,12 @@
       <code>0 3 * * *</code> = daily at 03:00.
     </p>
     {#if formError}
-      <p class="state err" role="alert">{formError}</p>
+      <p class="state err" role="alert">
+        {errorMessage(formError)}
+        {#if errorDocs(formError)}
+          <a class="error-fix" href={errorDocs(formError)} target="_blank" rel="noreferrer">How to fix</a>
+        {/if}
+      </p>
     {/if}
   </form>
 
@@ -141,7 +146,12 @@
       <span>Loading schedules…</span>
     </p>
   {:else if error}
-    <p class="state err" role="alert">{error}</p>
+    <p class="state err" role="alert">
+      {errorMessage(error)}
+      {#if errorDocs(error)}
+        <a class="error-fix" href={errorDocs(error)} target="_blank" rel="noreferrer">How to fix</a>
+      {/if}
+    </p>
   {:else if schedules.length === 0}
     <p class="state">No schedules configured.</p>
   {:else}

@@ -2,6 +2,21 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.21.0] - 2026-11-21
+### Errors
+- **Every API error is actionable.** Responses now carry `error` (stable code), `message` (what
+  happened, naming the offending value) and `docs` (a link to the new Errors page), including errors
+  forwarded from the core and SSE progress streams. A rejected `Host` now names the host and the
+  `MISH_ALLOWED_HOSTS` fix instead of a bare `forbidden_host`.
+- **New `/errors/` docs page.** Every code with its status, cause and fix, plus the startup messages
+  that never reach the API. `MISH_DOCS_URL` (default `http://localhost:3300`) sets the link base and
+  is passed through every compose file.
+- **The web UI renders a "How to fix" link** next to any error that carries a docs link.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.20.2 → 1.21.0.
+
 ## [1.20.2] - 2026-11-18
 ### Site
 - **The landing title names the category.** `mish — disk space analyzer for Linux servers` replaces
