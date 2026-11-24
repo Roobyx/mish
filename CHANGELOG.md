@@ -2,6 +2,16 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.21.1] - 2026-11-24
+### Fixed
+- **The server image builds again.** The docs coverage test reads the site's `errors.md`, which the
+  `js-build` stage never copied, so every image build failed on a clean clone and 1.21.0 was never
+  published. The stage now copies `apps/site/src/content/docs`.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.21.0 → 1.21.1.
+
 ## [1.21.0] - 2026-11-21
 ### Errors
 - **Every API error is actionable.** Responses now carry `error` (stable code), `message` (what

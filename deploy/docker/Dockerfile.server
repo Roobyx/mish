@@ -23,6 +23,9 @@ COPY package.json bun.lock tsconfig.base.json biome.json ./
 COPY packages ./packages
 COPY apps/server ./apps/server
 COPY apps/web ./apps/web
+# The server suite checks that every API error code has a docs section, so it
+# reads the site's errors page. Only the content is needed here, not the Astro app.
+COPY apps/site/src/content/docs ./apps/site/src/content/docs
 RUN bun install --frozen-lockfile
 # Gate on the TS test suites before producing artefacts.
 RUN bun run --filter '@mish/api-types' test \
