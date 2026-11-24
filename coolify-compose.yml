@@ -15,7 +15,7 @@ services:
     # caps so the core and Bun can read hosts whose /mnt is not world-readable
     # and write their own mish-owned data directory.
     user: "0:0"
-    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-1.21.1}-path
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-1.21.2}-path
     pull_policy: always
     ports:
       - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-9543}:9543"
@@ -64,7 +64,7 @@ services:
     restart: unless-stopped
 
   mish-site:
-    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-1.21.1}
+    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-1.21.2}
     pull_policy: always
     ports:
       - "${MISH_SITE_PORT:-3300}:80"
