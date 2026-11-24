@@ -5,6 +5,8 @@
  * contract the web client and the docs site build against.
  */
 
+import { readPackageVersion } from "./config.js";
+
 const ok = {
   "200": { description: "OK" },
   default: { $ref: "#/components/responses/Error" },
@@ -32,7 +34,7 @@ export const openApiDocument = {
   openapi: "3.0.3",
   info: {
     title: "mish API",
-    version: "1.21.0",
+    version: readPackageVersion(),
     description:
       "Read-only disk-space analyzer and indexer. All endpoints are read-only except scan creation, cancellation, snapshot GC and schedules.",
     license: { name: "GPL-3.0-or-later" },

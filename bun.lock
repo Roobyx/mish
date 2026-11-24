@@ -5,13 +5,13 @@
     "": {
       "name": "mish",
       "devDependencies": {
-        "@biomejs/biome": "^2.0.0",
+        "@biomejs/biome": "2.6.2",
         "typescript": "^5.6.0",
       },
     },
     "apps/server": {
       "name": "@mish/server",
-      "version": "1.20.2",
+      "version": "1.21.2",
       "dependencies": {
         "@mish/api-types": "workspace:*",
         "hono": "^4.6.0",
@@ -23,7 +23,7 @@
     },
     "apps/site": {
       "name": "@mish/site",
-      "version": "1.20.2",
+      "version": "1.21.2",
       "dependencies": {
         "@astrojs/sitemap": "^3.6.0",
         "@astrojs/starlight": "^0.34.0",
@@ -40,7 +40,7 @@
     },
     "apps/web": {
       "name": "@mish/web",
-      "version": "1.20.2",
+      "version": "1.21.2",
       "dependencies": {
         "@mish/api-types": "workspace:*",
       },
@@ -55,7 +55,7 @@
     },
     "packages/api-types": {
       "name": "@mish/api-types",
-      "version": "1.20.2",
+      "version": "1.21.2",
       "devDependencies": {
         "typescript": "^5.6.0",
       },

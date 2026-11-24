@@ -27,7 +27,7 @@ export interface ServerConfig {
   docsUrl: string;
 }
 
-function readPackageVersion(): string {
+export function readPackageVersion(): string {
   try {
     const url = new URL("../package.json", import.meta.url);
     const pkg = JSON.parse(readFileSync(url, "utf8")) as { version?: string };

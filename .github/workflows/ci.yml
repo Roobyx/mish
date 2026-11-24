@@ -1,0 +1,71 @@
+# Pull-request gate. `release.yml` only builds images when the version bumps, so
+# without this a broken Dockerfile or a test that reads a file the image never
+# copies reaches `main` and fails the release instead of the PR.
+#
+# The image job builds the stages the release builds (`js-build`, `build`) with
+# the same GHA cache scopes, and skips the Rust stage there: `rust` covers the
+# workspace tests on their own, and the musl release build stays in the release.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: Lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run test
+
+  rust:
+    name: Rust workspace tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo test --workspace --locked
+
+  images:
+    name: Image build (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: server
+            file: deploy/docker/Dockerfile.server
+            target: js-build
+          - label: site
+            file: deploy/docker/Dockerfile.site
+            target: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.label }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.label }}

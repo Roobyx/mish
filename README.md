@@ -10,7 +10,7 @@ Scan a filesystem once, then explore it as an interactive treemap in your browse
 Read-only, Docker-aware, JSON-first, and built for servers.
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.21.0-informational?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/github/package-json/v/Roobyx/mish?style=flat-square)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square)](#requirements)
 [![Docker Compose](https://img.shields.io/badge/docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)](#quick-start)
 [![No telemetry](https://img.shields.io/badge/telemetry-none-success?style=flat-square)](#security-model)
@@ -105,9 +105,9 @@ Diskover's Elasticsearch-shaped RAM bill.
 
 ## Quick start
 
-Docker Compose is the supported path. It builds the Rust core, the API server, the web client and
-the docs site, mounts the host filesystem read-only at `/host`, and starts a GET-only Docker socket
-proxy.
+Docker Compose is the supported path. Run the published images, or clone and build the Rust core,
+the API server, the web client and the docs site locally. Either way the host filesystem is mounted
+read-only at `/host` and Docker is reached through a GET-only socket proxy.
 
 ```bash
 git clone https://github.com/Roobyx/mish.git
@@ -130,6 +130,137 @@ docker compose exec mish cat /data/auth-token
 Then open the Drives dashboard and scan `/host`. That path is the host root, mounted read-only.
 To narrow the scope, set `HOST_MOUNT` to a specific host directory (it is always mounted at
 `/host`); additional bind mounts are listed in `MISH_ROOTS` by their container paths.
+
+### Pull the published image
+
+Every release publishes `linux/amd64` images to GHCR, so no clone or build is needed. Save this as
+`docker-compose.yml` and run `docker compose up -d`:
+
+```yaml
+services:
+  mish:
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}
+    ports:
+      - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-9543}:9543"
+    environment:
+      MISH_DATA_DIR: /data
+      MISH_BIND: ${MISH_BIND:-0.0.0.0:9543}
+      MISH_CORE_SOCKET: /run/mish/mish.sock
+      MISH_ROOTS: ${MISH_ROOTS:-/host}
+      MISH_HOST_ROOT: /host
+      MISH_DOCKER: ${MISH_DOCKER:-true}
+      MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MISH_TRUST_PROXY: ${MISH_TRUST_PROXY:-false}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+      - mish-data:/data
+      - ${HOST_MOUNT:-/}:/host:ro
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - docker-socket-proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9543/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      VOLUMES: 1
+      EVENTS: 0
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  mish-site:
+    image: ghcr.io/roobyx/mish/site:${MISH_TAG:-latest}
+    ports:
+      - "${MISH_SITE_PORT:-3300}:80"
+    restart: unless-stopped
+
+volumes:
+  mish-data:
+```
+
+Set `HOST_MOUNT` to the host directory to expose at `/host` and `MISH_ROOTS` to the paths the API
+may scan inside it. Pin `MISH_TAG` to a release tag instead of `latest` for
+reproducible upgrades, and read the generated token with
+`docker compose exec mish cat /data/auth-token`. The app port stays on loopback; for LAN access see
+[LAN access](#lan-access). On upgrades run `docker compose pull` before `up -d`; Compose otherwise
+keeps an existing local `latest`.
+
+### Coolify
+
+Coolify deploys the same stack from a Docker Compose resource. This variant pulls the `-path` image
+(the web bundle built with `MISH_WEB_BASE=/app/`), runs as root with `DAC_OVERRIDE` so it can read
+hosts whose `/mnt` is not world-readable, and trusts proxy headers. Paste it into a Compose
+resource and set `HOST_MOUNT`, `MISH_ROOTS`, `MISH_AUTH_TOKEN` and `MISH_ALLOWED_HOSTS`:
+
+```yaml
+services:
+  mish:
+    image: ghcr.io/roobyx/mish/server:${MISH_TAG:-latest}-path
+    pull_policy: always
+    user: "0:0"
+    ports:
+      - "${MISH_PUBLISH_ADDR:-127.0.0.1}:${MISH_PORT:-9543}:9543"
+    environment:
+      MISH_DATA_DIR: /data
+      MISH_BIND: ${MISH_BIND:-0.0.0.0:9543}
+      MISH_CORE_SOCKET: /run/mish/mish.sock
+      MISH_ROOTS: ${MISH_ROOTS:-/host}
+      MISH_HOST_ROOT: /host
+      MISH_DOCKER: ${MISH_DOCKER:-true}
+      MISH_AUTH_TOKEN: ${MISH_AUTH_TOKEN:-}
+      MISH_ALLOWED_HOSTS: ${MISH_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MISH_TRUST_PROXY: "true"
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+      - mish-data:/data
+      - ${HOST_MOUNT:-/}:/host:ro
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - docker-socket-proxy
+    restart: unless-stopped
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      VOLUMES: 1
+      EVENTS: 0
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+volumes:
+  mish-data:
+```
+
+The full stack, including the docs site, is [`coolify-compose.yml`](coolify-compose.yml). Coolify's
+built-in proxy is not used: the app publishes host ports and an external reverse proxy routes it
+under `/app/`. Set `MISH_ALLOWED_HOSTS` to the public hostname (or `*` behind a proxy that rewrites
+`Host`), and keep `MISH_TRUST_PROXY=true` only when a trusted proxy sets the forwarding headers.
 
 ### Requirements
 

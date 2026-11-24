@@ -1,7 +1,9 @@
+import pkg from "../../package.json";
+
 export const site = {
   name: "mish",
   title: "mish — disk space analyzer for Linux servers",
-  version: "1.21.0",
+  version: pkg.version,
   tagline: "Where did the disk space go?",
   description:
     "Scan a filesystem once, then explore it as an interactive treemap in your browser. Read-only, Docker-aware, JSON-first, and built for servers.",
@@ -178,11 +180,7 @@ export const faq = [
 ];
 
 export const install = {
-  commands: [
-    "git clone https://github.com/Roobyx/mish",
-    "cd mish",
-    "docker compose up -d --build",
-  ],
+  commands: ["git clone https://github.com/Roobyx/mish", "cd mish", "docker compose up -d --build"],
   requirements: [
     { label: "OS", value: "Linux. The portable scanner builds on macOS and Windows." },
     { label: "Runtime", value: "Docker Engine with Compose v2." },

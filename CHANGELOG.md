@@ -2,11 +2,34 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.21.2] - 2026-11-24
+### Documentation
+- **README quick start has copy-paste compose files.** A pull-only stack (no `build:`) runs the
+  GHCR images without a checkout, and a Coolify variant documents the `-path` image, the root user
+  and the proxy settings. Both show where `HOST_MOUNT` and `MISH_ROOTS` belong.
+
+### Tooling
+- **Version strings are derived, not copied.** The OpenAPI document and the landing page's
+  structured data read `package.json`, and the README badge tracks the manifest on GitHub, so a
+  release bump no longer needs three manual edits that already drifted twice.
+- **CI builds the image stages on every pull request.** The server `js-build` stage and the site
+  `build` stage are built with the same GHA cache scopes as the release, next to the bun checks and
+  the Rust workspace tests, so a test that reads a file the image does not copy fails before merge
+  instead of at release.
+- **Biome is pinned and matches its config.** The schema and `preset` were migrated to 2.6.2, the
+  markdown formatter is off so docs frontmatter is left alone, and `bun run check` is green again.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.21.1 → 1.21.2.
+
 ## [1.21.1] - 2026-11-24
 ### Fixed
 - **The server image builds again.** The docs coverage test reads the site's `errors.md`, which the
   `js-build` stage never copied, so every image build failed on a clean clone and 1.21.0 was never
   published. The stage now copies `apps/site/src/content/docs`.
+- **Version strings agree again.** The OpenAPI document, the landing page's structured data and the
+  README badge still reported 1.21.0 after the 1.21.0 release; they now report 1.21.1.
 
 ### Version updates
 - Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
@@ -19,8 +42,8 @@ All notable changes to mish are documented here. Newest entries first.
   forwarded from the core and SSE progress streams. A rejected `Host` now names the host and the
   `MISH_ALLOWED_HOSTS` fix instead of a bare `forbidden_host`.
 - **New `/errors/` docs page.** Every code with its status, cause and fix, plus the startup messages
-  that never reach the API. `MISH_DOCS_URL` (default `http://localhost:3300`) sets the link base and
-  is passed through every compose file.
+  that never reach the API. `MISH_DOCS_URL` (default: the `errors.md` page on GitHub) sets the link
+  base and is passed through every compose file.
 - **The web UI renders a "How to fix" link** next to any error that carries a docs link.
 
 ### Version updates
