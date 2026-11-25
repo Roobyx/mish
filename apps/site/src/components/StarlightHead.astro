@@ -1,6 +1,8 @@
 ---
 // Starlight renders only the frontmatter `head` entries in this component, so
 // this override keeps that behaviour and appends the docs breadcrumb trail.
+import Umami from "./Umami.astro";
+
 const { head, entry } = Astro.locals.starlightRoute;
 const base = Astro.site ?? new URL("http://localhost:3300");
 const breadcrumbs = {
@@ -21,3 +23,4 @@ const jsonLd = JSON.stringify(breadcrumbs).replace(/</g, "\\u003c");
 
 {head.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}
 <script type="application/ld+json" set:html={jsonLd} />
+<Umami />

@@ -1,0 +1,22 @@
+---
+import { umami } from "../lib/umami.js";
+---
+
+{
+  umami && (
+    <>
+      <script
+        is:inline
+        defer
+        src={`${umami.src}/script.js`}
+        data-website-id={umami.websiteId}
+      />
+      <script
+        is:inline
+        defer
+        src={`${umami.src}/recorder.js`}
+        data-website-id={umami.websiteId}
+      />
+    </>
+  )
+}

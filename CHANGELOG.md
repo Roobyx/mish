@@ -2,6 +2,17 @@
 
 All notable changes to mish are documented here. Newest entries first.
 
+## [1.21.3] - 2026-11-25
+### Site
+- **Umami analytics is opt-in per build and carries no identifiers in the repo.** The landing and
+  docs pages load `script.js` and `recorder.js` only when `UMAMI_SRC` and `UMAMI_WEBSITE_ID` are
+  set, so a clone, a fork or the self-hosted nginx image ships no third-party scripts. Set both in
+  the Cloudflare Pages build environment to enable tracking.
+
+### Version updates
+- Root, `@mish/web`, `@mish/server`, `@mish/site`, `@mish/api-types` and the Cargo workspace
+  1.21.2 → 1.21.3.
+
 ## [1.21.2] - 2026-11-24
 ### Documentation
 - **README quick start has copy-paste compose files.** A pull-only stack (no `build:`) runs the

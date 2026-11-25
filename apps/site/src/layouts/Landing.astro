@@ -1,6 +1,7 @@
 ---
 import Footer from "../components/landing/Footer.astro";
 import Header from "../components/landing/Header.astro";
+import Umami from "../components/Umami.astro";
 import { site } from "../data/site.js";
 import "../styles/fonts.css";
 import "../styles/tokens.css";
@@ -98,6 +99,7 @@ const jsonLd = {
         }
       }, 2500);
     </script>
+    <Umami />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>

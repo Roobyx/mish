@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "mish-cli"
-version = "1.21.2"
+version = "1.21.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "mish-core"
-version = "1.21.2"
+version = "1.21.3"
 dependencies = [
  "blake3",
  "globset",
@@ -379,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "mish-ipc"
-version = "1.21.2"
+version = "1.21.3"
 dependencies = [
  "serde",
  "serde_json",
